@@ -1,5 +1,5 @@
 (ns mindnet.slices
-  (:refer-clojure :exclude [read < > take take-last split conj conj!])
+  (:refer-clojure :exclude [read write < > take take-last split conj conj!])
   (:import [java.nio ByteBuffer]))
 
 ;;
@@ -93,16 +93,33 @@
         (cons buffer
               (buffers (> slice (buffer-size buffer))))))))
 
-(defn write [slice bytes]
-  (reduce (fn [offset ^ByteBuffer buffer]
-            (let [size (min (- (count bytes) offset) (buffer-size buffer))]
-              (.put buffer bytes offset size)
-              (+ offset size)))
-          0 (buffers slice)))
+(defn write
+  ([slice bytes] (write slice bytes (count bytes)))
+  ([slice bytes size] (write slice bytes 0 size))
+  ([slice bytes offset size]
+     (reduce (fn [offset ^ByteBuffer buffer]
+               (let [size (min (- size offset) (buffer-size buffer))]
+                 (.put buffer bytes offset size)
+                 (+ offset size)))
+             offset (buffers slice))
+     slice))
+  
 
-(defn read [slice bytes]
-  (reduce (fn [offset ^ByteBuffer buffer]
-            (let [size (min (- (count bytes) offset) (buffer-size buffer))]
-              (.get buffer bytes offset size)
-              (+ offset size)))
-          0 (buffers slice)))
+(defn write! [slice-atom bytes]
+  (write (conj! slice-atom (count bytes)) bytes)
+  slice-atom)
+
+(defn read
+  ([slice bytes] (read slice bytes (count bytes)))
+  ([slice bytes size] (read slice bytes 0 size))
+  ([slice bytes offset size]
+     (reduce (fn [offset ^ByteBuffer buffer]
+               (let [size (min (- size offset) (buffer-size buffer))]
+                 (.get buffer bytes offset size)
+                 (+ offset size)))
+             offset (buffers slice))
+     slice))
+
+(defn read! [slice-atom bytes]
+  (read (split! slice-atom (count bytes)) bytes)
+  slice-atom)

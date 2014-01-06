@@ -27,14 +27,13 @@
 
 (defn write-byte! [{:keys [reader writer] :as buffer} b]
   (.put ^ByteBuffer (s/buffer @writer) ^byte b)
-  (s/slice>! writer 1)
-  (s/slice<! reader 1)
+  (s/>! writer 1)
+  (s/<! reader 1)
   buffer)
 
 (defn write-bytes! [{:keys [reader writer]:as buffer} bytes]
-  (s/write @writer bytes)
-  (s/slice>! writer (count bytes))
-  (s/slice<! reader (count bytes))
+  (s/write (s/split! writer (count bytes)) bytes)
+  (s/<! reader (count bytes))
   buffer)
 
 (defn peek-byte [{reader :reader}]
@@ -42,15 +41,15 @@
 
 (defn read-byte! [{:keys [reader writer]}]
   (let [value (.get ^ByteBuffer (s/buffer @reader))]
-    (s/slice>! reader 1)
-    (s/slice<! writer 1)
+    (s/>! reader 1)
+    (s/<! writer 1)
     value))
 
 (defn read-bytes! [{:keys [reader writer] :as buffer} size]
   (let [value (byte-array size)]
     (s/read @reader value)
-    (s/slice>! reader size) 
-    (s/slice<! writer size)
+    (s/>! reader size) 
+    (s/<! writer size)
     value))
 
         

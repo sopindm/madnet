@@ -76,8 +76,11 @@
     (?= (seq (read-bytes! b *buffer-capacity*)) (byte-seq *buffer-capacity*))))
 
 ;switch from *buffer-capacity* to (capacity b)
+;don't support peek-byte and read/write-byte
+
 ;read bytes in existing array
 ;writing bytes from byte seq's
+;writing/reading from/to other buffer
 
 ;writing and reading too much
 

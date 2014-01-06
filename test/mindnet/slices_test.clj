@@ -1,5 +1,5 @@
 (ns mindnet.slices-test
-  (:refer-clojure :exclude [read > < take take-last split conj conj!])
+  (:refer-clojure :exclude [read > < take take-last split conj conj! write])
   (:require [khazad-dum.core :refer :all]
             [mindnet.slices :refer :all])
   (:import [java.nio ByteBuffer BufferUnderflowException BufferOverflowException]))
@@ -99,9 +99,51 @@
     (?buffers= (buffers s3) [])
     (?buffers= (buffers s4) [[768 1024 1024] [0 256 1024]])))
 
-;write, read, write! and read! tests
-;parrallel reading and writing
-;try-write, try-read, try-write!, try-read!
+(deftest writing-and-reading-for-slices
+  (let [s (slice (ByteBuffer/allocate 1024))]
+    (write s (byte-array (map byte (range -128 128))))
+    (let [bytes (byte-array 256)]
+      (read s bytes)
+      (?= (seq bytes) (range -128 128))))
+  (let [s (slice (ByteBuffer/allocate 1024))
+        s2 (< (> s 1000) 24)]
+    (write s2 (byte-array (map byte (range 0 48))))
+    (let [bytes (byte-array 48)]
+      (read s2 bytes)
+      (?= (seq bytes) (range 0 48)))))
+
+(deftest read-and-write-with-offset-and-size-arguments
+  (let [s (slice (ByteBuffer/allocate 1024))]
+    (write s (byte-array (map byte (range 128))) 64)
+    (let [bytes1 (byte-array 64)
+          bytes2 (byte-array 128)]
+      (read s bytes1)
+      (read s bytes2 64)
+      (?= (seq bytes1) (range 64))
+      (?= (clojure.core/take 64 (seq bytes2)) (range 64))))
+  (let [s (slice (ByteBuffer/allocate 1024))]
+    (write s (byte-array (map byte (range 128))) 64 128)
+    (let [bytes1 (byte-array 64)
+          bytes2 (byte-array 128)
+          bytes3 (byte-array 128)]
+      (read s bytes1)
+      (?= (seq bytes1) (seq (range 64 128)))
+      (read s bytes2 64)
+      (?= (seq (clojure.core/take 64 bytes2)) (seq (range 64 128)))
+      (read s bytes3 64 128)
+      (?= (seq (drop 64 bytes3)) (seq (range 64 128))))))
+
+(deftest write!-and-read!
+  (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
+    (write! s (byte-array (map byte (range -128 128))))
+    (?slice= @s [0 256 1024])
+    (let [bytes (byte-array 256)]
+      (read! s bytes)
+      (?slice= @s [256 0 1024])
+      (?= (seq bytes) (map byte (range -128 128))))))
+
+;read!, write! with size and offset arguments
+;read and write from/to slice with size and offset arguments
 
 ;iseq for slice (for readonly use)
 
