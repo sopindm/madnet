@@ -1,6 +1,6 @@
 (ns madnet.slices
   (:refer-clojure :exclude [read write < > take take-last split conj conj! count])
-  (:import [java.nio ByteBuffer]))
+  (:import [java.nio Buffer ByteBuffer]))
 
 (defmulti count class)
 
@@ -11,10 +11,10 @@
 (defn- buffer+ [buffer dlt]
   (.position (.duplicate buffer) (+ (.position buffer) dlt)))
 
-(defn- limit [buffer size]
+(defn- ^Buffer limit [^Buffer buffer size]
   (.limit buffer (min (.limit buffer) (+ (.position buffer) size))))
 
-(defmethod count ByteBuffer [buffer]
+(defmethod count ByteBuffer [^ByteBuffer buffer]
   (- (.limit buffer) (.position buffer)))
 
 ;;
@@ -82,15 +82,14 @@
     [(take-last conj size) conj]))
   
 (defn split! [slice-atom size]
-  (:split (swap! slice-atom 
-                 #(let [[split new] (split % size)]
-                    (assoc new :split split)))))
+  (let [[split new] (split @slice-atom size)]
+    (reset! slice-atom new)
+    split))
 
 (defn conj! [slice-atom size]
-  (:conj (swap! slice-atom
-                #(let [[part all] (conj % size)]
-                   (assoc all
-                     :conj part)))))
+  (let [[part all] (conj @slice-atom size)]
+    (reset! slice-atom all)
+    part))
 
 (defn buffer [slice]
   (let [{:keys [^ByteBuffer buffer position size]} slice
@@ -112,14 +111,14 @@
 (defmulti copy (fn [src dst src-offset dst-offset size] [(class src) (class dst)]))
 
 (defmethod copy [(Class/forName "[B") ByteBuffer] [src dst src-offset dst-offset size]
-  (.put (buffer+ dst dst-offset) src src-offset size))
+  (.put ^ByteBuffer (buffer+ dst dst-offset) src src-offset size))
 
 (defmethod copy [ByteBuffer (Class/forName "[B")] [src dst src-offset dst-offset size]
-  (.get (buffer+ src src-offset) dst dst-offset size))
+  (.get ^ByteBuffer (buffer+ src src-offset) dst dst-offset size))
 
 (defmethod copy [ByteBuffer ByteBuffer] [src dst src-offset dst-offset size]
-  (.put (limit (buffer+ dst dst-offset) size)
-        (limit (buffer+ src src-offset) size)))
+  (.put ^ByteBuffer (limit (buffer+ dst dst-offset) size)
+        ^ByteBuffer (limit (buffer+ src src-offset) size)))
 
 (defmethod copy [Slice Object] [src dst src-offset dst-offset size]
   (reduce (fn [offset buffer]

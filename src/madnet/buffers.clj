@@ -16,10 +16,10 @@
   (-> b :writer deref s/capacity))
 
 (defn size [b]
-  (-> b :reader deref s/size))
+  (-> b :reader deref s/count))
 
 (defn free-space [b]
-  (-> b :writer deref s/size))
+  (-> b :writer deref s/count))
 
 ;;
 ;; Generic reading/writing

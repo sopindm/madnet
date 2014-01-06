@@ -194,6 +194,7 @@
       (read s3 bytes3)
       (?= (seq bytes3) (seq (range 128))))))
 
+;refactor slice to deftype
 ;iseq for slice (for readonly use)
 
 ;slices for CharBuffer
