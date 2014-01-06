@@ -1,12 +1,12 @@
-(ns mindnet.slices-test
-  (:refer-clojure :exclude [read > < take take-last split conj conj! write])
+(ns madnet.slices-test
+  (:refer-clojure :exclude [read > < take take-last split conj conj! write count])
   (:require [khazad-dum.core :refer :all]
-            [mindnet.slices :refer :all])
+            [madnet.slices :refer :all])
   (:import [java.nio ByteBuffer BufferUnderflowException BufferOverflowException]))
 
 (defmacro ?slice= [form [position size capacity]]
   `(do (?= (position ~form) ~position)
-       (?= (size ~form) ~size)
+       (?= (count ~form) ~size)
        (?= (capacity ~form) ~capacity)))
 
 (deftest making-slice
@@ -76,7 +76,7 @@
        (?= (.capacity ~expr) ~capacity)))
 
 (defmacro ?buffers= [expr [& specs]]
-  `(do (?= (count ~expr) ~(count specs))
+  `(do (?= (clojure.core/count ~expr) ~(clojure.core/count specs))
        ~@(map-indexed (fn [i spec] `(?buffer= (nth ~expr ~i) ~spec)) specs)))
 
 (deftest slice-buffer
@@ -122,7 +122,7 @@
       (?= (seq bytes1) (range 64))
       (?= (clojure.core/take 64 (seq bytes2)) (range 64))))
   (let [s (slice (ByteBuffer/allocate 1024))]
-    (write s (byte-array (map byte (range 128))) 64 128)
+    (write s (byte-array (map byte (range 128))) 64 64)
     (let [bytes1 (byte-array 64)
           bytes2 (byte-array 128)
           bytes3 (byte-array 128)]
@@ -130,7 +130,7 @@
       (?= (seq bytes1) (seq (range 64 128)))
       (read s bytes2 64)
       (?= (seq (clojure.core/take 64 bytes2)) (seq (range 64 128)))
-      (read s bytes3 64 128)
+      (read s bytes3 64 64)
       (?= (seq (drop 64 bytes3)) (seq (range 64 128))))))
 
 (deftest write!-and-read!
@@ -142,8 +142,57 @@
       (?slice= @s [256 0 1024])
       (?= (seq bytes) (map byte (range -128 128))))))
 
-;read!, write! with size and offset arguments
-;read and write from/to slice with size and offset arguments
+(deftest write!-and-read!-with-size-argument
+  (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
+    (write! s (byte-array (map byte (range 128))) 64)
+    (let [bytes1 (byte-array 64)
+          bytes2 (byte-array 128)]
+      (read @s bytes1)
+      (?= (seq bytes1) (seq (range 64)))
+      (read! s bytes2 64)
+      (?= (seq (clojure.core/take 64 bytes2)) (seq (range 64))))))
+
+(deftest write!-and-read!-with-offset-argument
+  (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
+    (write! s (byte-array (map byte (range 128))) 64 64)
+    (let [bytes1 (byte-array 64)
+          bytes2 (byte-array 128)]
+      (read @s bytes1)
+      (?= (seq bytes1) (seq (range 64 128)))
+      (read! s bytes2 64 64)
+      (?= (seq (drop 64 bytes2)) (seq (range 64 128))))))
+
+(deftest writing-and-reading-for-byte-buffers
+  (let [s1 (slice (ByteBuffer/allocate 1024) 128)
+        s2 (slice (ByteBuffer/allocate 1024))
+        s3 (slice (ByteBuffer/allocate 1024) 128)]
+    (write s1 (byte-array (map byte (range 128))))
+    (write s2 (buffer s1))
+    (let [bytes (byte-array 128)]
+      (read s2 bytes)
+      (?= (seq bytes) (seq (range 128))))
+    (read s2 (buffer s3))
+    (let [bytes (byte-array 128)]
+      (read s3 bytes)
+      (?= (seq bytes) (seq (range 128))))))
+
+(deftest writing-and-reading-slices-to-slices
+  (let [s1 (slice (ByteBuffer/allocate 1024) 128)
+        s2 (slice (ByteBuffer/allocate 1024) 1000 256)
+        s3 (slice (ByteBuffer/allocate 1024) 128)]
+    (write s1 (byte-array (map byte (range 128))))
+    (write s2 s1 128)
+    (read s1 s2 128 128)
+    (write s3 s2 128 128)
+    (let [bytes1 (byte-array 128)
+          bytes2 (byte-array 256)
+          bytes3 (byte-array 128)]
+      (read s1 bytes1)
+      (?= (seq bytes1) (seq (range 128)))
+      (read s2 bytes2)
+      (?= (seq bytes2) (seq (concat (range 128) (range 128))))
+      (read s3 bytes3)
+      (?= (seq bytes3) (seq (range 128))))))
 
 ;iseq for slice (for readonly use)
 

@@ -1,5 +1,5 @@
-(ns mindnet.buffers
-  (:require [mindnet.slices :as s])
+(ns madnet.buffers
+  (:require [madnet.slices :as s])
   (:import [java.nio ByteBuffer]))
 
 ;;

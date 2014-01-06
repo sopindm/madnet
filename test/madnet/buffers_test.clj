@@ -1,6 +1,6 @@
-(ns mindnet.buffers-test
+(ns madnet.buffers-test
   (:require [khazad-dum.core :refer :all]
-            [mindnet.buffers :refer :all])
+            [madnet.buffers :refer :all])
   (:import [java.nio BufferUnderflowException BufferOverflowException]))
 
 (deftest writing-and-reading-bytes
