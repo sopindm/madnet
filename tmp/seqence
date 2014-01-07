@@ -1,0 +1,19 @@
+interface IBuffer
+{
+    ISequence empty();
+    int size();
+}
+
+interface ISequence 
+{
+    IBuffer buffer();
+
+    ISequence take(int n);
+    ISequence drop(int n);
+    ISequence expand(int size);
+
+    int size();
+
+    Tuple<ISequence, Object> read();
+    ISequence write(Object data);
+}

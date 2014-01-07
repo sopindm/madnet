@@ -1,0 +1,33 @@
+1. Buffers and buffer sequencies abstraction
+
+byte[], char[], Object[] ...     |
+                                 |  Buffers
+ByteBuffer, CharBuffer           |   
+
+
+--------------------------------------------------------------
+
+
+CurcularSlice, Multislice
+
+   ^
+   |
+       | ByteArraySlice, ByteBufferSlice |
+ISlice |                                 | Buffer sequencies
+       | CharArraySlice, CharBufferSlice |
+
+   ^
+   |
+
+ISequence
+
+IReadable = IGenerator   <-    Generators (Clojure seq's)
+IWritable = IProcessor   <-    Processors (Clojure fns???)
+  
+
+2. Channel abstraction (buffer sequencies are channels)
+2.5. Clojure seq's as read-only channels, clojure generators as write-only channels
+3. Chain channels
+4. Add java nio channels
+5. Selectors
+...

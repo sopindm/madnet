@@ -76,7 +76,6 @@
     (?= (seq (read-bytes! b *buffer-capacity*)) (byte-seq *buffer-capacity*))))
 
 ;switch from *buffer-capacity* to (capacity b)
-;don't support peek-byte and read/write-byte
 
 ;read bytes in existing array
 ;writing bytes from byte seq's
@@ -86,10 +85,13 @@
 
 ;reading and writing slices (chunks)
 
-;conditional writes and read
+;conditional writes and read???
 
 ;writing and reading byte arrays
 ;writing and reading strings (+encoding, default encoding)
+
+;writing and reading primitives + benchmarks
+;random access
 
 ;splitting and concatenating
 ;seq + string wrapper

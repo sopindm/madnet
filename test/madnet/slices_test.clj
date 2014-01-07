@@ -1,8 +1,11 @@
 (ns madnet.slices-test
-  (:refer-clojure :exclude [read > < take take-last split conj conj! write count])
+  (:refer-clojure :exclude [read > < take take-last split conj conj! write count get])
   (:require [khazad-dum.core :refer :all]
             [madnet.slices :refer :all])
-  (:import [java.nio ByteBuffer BufferUnderflowException BufferOverflowException]))
+  (:import [java.nio ByteBuffer CharBuffer
+            BufferUnderflowException
+            BufferOverflowException]
+           [java.nio.charset Charset]))
 
 (defmacro ?slice= [form [position size capacity]]
   `(do (?= (position ~form) ~position)
@@ -10,8 +13,17 @@
        (?= (capacity ~form) ~capacity)))
 
 (deftest making-slice
-  (let [s (slice (ByteBuffer/allocate 1024))]
-    (?slice= s [0 1024 1024])))
+  (let [s1 (slice (ByteBuffer/allocate 1024))
+        s2 (slice (ByteBuffer/allocate 1024) 128)
+        s3 (slice (ByteBuffer/allocate 1024) 128 128)]
+    (?slice= s1 [0 1024 1024])
+    (?slice= s2 [0 128 1024])
+    (?slice= s3 [128 128 1024])))
+
+(deftest too-much-size-for-slice
+  (?throws (slice (ByteBuffer/allocate 1024) 2024) IllegalArgumentException)
+  (?throws (slice (ByteBuffer/allocate 1024) 512 1025) IllegalArgumentException)
+  (?throws (slice (ByteBuffer/allocate 128) 129 1) IllegalArgumentException))
 
 (deftest making-slice-with-modifyed-buffer
   (let [b (.limit (.position (ByteBuffer/allocate 1024) 100) 200)
@@ -101,9 +113,10 @@
 
 (deftest writing-and-reading-for-slices
   (let [s (slice (ByteBuffer/allocate 1024))]
-    (write s (byte-array (map byte (range -128 128))))
+    (?slice= (write s (byte-array (map byte (range -128 128))))
+             [256 768 1024])
     (let [bytes (byte-array 256)]
-      (read s bytes)
+      (?slice= (read s bytes) [256 768 1024])
       (?= (seq bytes) (range -128 128))))
   (let [s (slice (ByteBuffer/allocate 1024))
         s2 (< (> s 1000) 24)]
@@ -194,12 +207,83 @@
       (read s3 bytes3)
       (?= (seq bytes3) (seq (range 128))))))
 
-;refactor slice to deftype
-;iseq for slice (for readonly use)
+(deftest slices-read-and-write-exceptions
+  (let [s1 (slice (ByteBuffer/allocate 1024) 512)
+        s2 (slice (ByteBuffer/allocate 1024) 768 512)]
+    (?throws (write s1 (byte-array 1024)) BufferOverflowException)
+    (?throws (read s1 (byte-array 1024)) BufferUnderflowException)
+    (?throws (write s2 (byte-array 513)) BufferOverflowException)
+    (?throws (read s2 (byte-array 513)) BufferUnderflowException)))
 
-;slices for CharBuffer
+(deftest slices-seq-writing
+  (let [s (slice (ByteBuffer/allocate 1024))]
+    (write s (range -128 128))
+    (let [bytes (byte-array 256)]
+      (read s bytes)
+      (?= (seq bytes) (seq (range -128 128))))))
+
+(deftest slice-random-access
+  (let [s (slice (ByteBuffer/allocate 256) 128 256)]
+    (write s (range -128 128))
+    (?= (seq (for [i (range 0 256)]
+               (get s i)))
+        (seq (range -128 128)))
+    (?throws (get s -1) IndexOutOfBoundsException)
+    (?throws (get s 256) IndexOutOfBoundsException)))
+
+(deftest slice-to-seq
+  (let [s (slice (ByteBuffer/allocate 256) 128 256)]
+    (write s (range -128 128))
+    (?= (seq s)
+        (seq (range -128 128)))))
+
+(deftest slices-for-char-buffers
+  (let [s (slice (CharBuffer/allocate 256))
+        string (clojure.core/take 256 (cycle "abc"))]
+    (write s (char-array string))
+    (?= (seq s) (seq string))
+    (let [chars (char-array 256)]
+      (read s chars)
+      (?= (seq chars) (seq string)))
+    (let [s2 (slice (CharBuffer/allocate 256))]
+      (read s s2)
+      (?= (seq s2) (seq string)))))
+
+(deftest char-slices-to-bytes
+  (let [bs (slice (ByteBuffer/allocate 256))
+        cs (slice (CharBuffer/allocate 256))
+        string (seq "some string")] 
+    (write cs string)
+    (write bs cs)
+    (?= (seq (clojure.core/take (count string) bs))
+        (seq (map byte string)))
+    (let [moved-slice (< (> bs 255) 100)]
+      (write moved-slice cs (count string))
+      (?= (seq (clojure.core/take (count string) moved-slice))
+          (seq (map byte string))))))
+
+(deftest multibyte-chars-to-bytes
+  (let [bs (slice (ByteBuffer/allocate 256))
+        cs (slice (CharBuffer/allocate 256))
+        string (seq "\u1100\u1101\u1102\u1103")
+        bytes [-31 -124 -128 -31 -124 -127 -31 -124 -126 -31 -124 -125]]
+    (write cs string)
+    (write bs cs)
+    (?= (seq (clojure.core/take 12 (seq bs))) bytes)
+    (let [moved-slice (< (> bs 253) 253)]
+      (write moved-slice cs)
+      (?= (seq (clojure.core/take 12 (seq moved-slice)))
+          bytes))
+    (let [moved-slice (< (> bs 255) 255)]
+      (write moved-slice cs)
+      (?= (seq (clojure.core/take 12 (seq moved-slice)))
+          bytes))))
+          
+;reading/writing strings from/to bytes
 
 ;readonly and writeonly slices
 
-;separate slice-atoms, slice-refs and slice-agents packages
+;cycling and no-cycling slices
+;separate slice-atoms, slice-refs and slice-agents packages??? or move to Java???
+
 
