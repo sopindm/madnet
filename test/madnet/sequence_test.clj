@@ -1,27 +1,31 @@
 (ns madnet.sequence-test
   (:require [khazad-dum.core :refer :all]
-            [madnet.buffer :as b]
             [madnet.sequence :as s])
   (:import [java.nio ByteBuffer CharBuffer
             BufferUnderflowException
             BufferOverflowException]
-           [java.nio.charset Charset]))
+           [java.nio.charset Charset]
+           [madnet.sequence IBuffer ISequence ASequence]))
 
 (defmacro ?sequence= [form [position size]]
   `(do (?= (s/position ~form) ~position)
        (?= (s/size ~form) ~size)))
 
 (defn- buffer [size]
-  (reify b/IBuffer
-    (b/size [this] size)
-    (b/emptySequence [this] (s/->ASequence this 0 0))))
+  (reify IBuffer
+    (size [this] size)
+    (sequence [this pos size] (ASequence. this pos size))
+    Object
+    (equals [this obj] (and (isa? (class obj) (class this))
+                            (= (.size ^IBuffer obj) size)))))
 
 (defn- a-sequence [buffer-size position size]
-  (s/->ASequence (buffer buffer-size) position size))
+  (ASequence. (buffer buffer-size) position size))
 
 (deftest making-sequence
-  (?sequence= (s/->ASequence nil 0 100) [0 100])
-  (?sequence= (a-sequence nil 0 100) [0 100]))
+  (?sequence= (ASequence. nil 0 100) [0 100])
+  (?sequence= (a-sequence nil 0 100) [0 100])
+  (?= (s/buffer (a-sequence 100 0 100)) (buffer 100)))
 
 (deftest sequence-capacity-and-free-space
   (let [s (a-sequence 200 0 100)]
@@ -67,27 +71,21 @@
     (?throws (s/take-last 150 s) BufferUnderflowException)
     (?throws (s/take-last -1 s) IllegalArgumentException)))
 
-;split function
-;conj function
+(deftest split-sequence
+  (let [s (s/sequence (buffer 200) 150)
+        ss (s/split 80 s)]
+    (?= (count ss) 2)
+    (?sequence= (first ss) [0 80])
+    (?sequence= (second ss) [80 70])))
+
+(deftest append-sequence
+  (let [s (s/sequence (buffer 200) 120)
+        ss (s/append 40 s)]
+    (?= (count ss) 2)
+    (?sequence= (first ss) [120 40])
+    (?sequence= (second ss) [0 160])))
 
 (comment
-  (deftest ssplit-and-sconj
-    (let [s (slice (ByteBuffer/allocate 1024))
-          [s2 s3] (split s 100)
-          [s4 s5] (conj s3 50)]
-      (?slice= s2 [0 100 1024])
-      (?slice= s3 [100 924 1024])
-      (?slice= s4 [0 50 1024])
-      (?slice= s5 [100 974 1024])))
-
-  (deftest ssplit!-and-sconj!
-    (let [s (atom (slice (ByteBuffer/allocate 1024)))
-          s2 (split! s 900)
-          s3 (conj! s 500)]
-      (?slice= @s [900 624 1024])
-      (?slice= s2 [0 900 1024])
-      (?slice= s3 [0 500 1024])))
-
   (defmacro ?buffer= [expr [pos limit capacity]]
     `(do (?= (.position ~expr) ~pos)
          (?= (.limit ~expr) ~limit)

@@ -1,45 +1,51 @@
 (ns madnet.sequence
-  (:refer-clojure :exclude [take drop])
-  (:require [madnet.buffer :as b])
+  (:refer-clojure :exclude [take drop sequence take-last drop-last])
   (:import [java.nio Buffer ByteBuffer CharBuffer]
-           [java.nio.charset Charset]))
+           [java.nio.charset Charset]
+           [madnet.sequence IBuffer ISequence ASequence]))
 
-(defprotocol ISequence
-  (buffer [this])
-  (size [this])
-  (take [this n])
-  (drop [this n])
-  (expand [this size]))
+;;
+;; ISequence and ASequence method wrappers
+;;
 
-(deftype ASequence [buffer position size]
-  ISequence
-  (buffer [this] buffer)
-  (size [this] size)
-  (take [this n] (ASequence. buffer position n))
-  (drop [this n] (ASequence. buffer (+ position n) (- size n)))
-  (expand [this n] (ASequence. buffer position (+ size n))))
+(defn ^IBuffer buffer [^ISequence seq]
+  (.buffer seq))
 
-(defn position [seq]
-  (.position seq))
+(defn size [^ISequence seq]
+  (.size seq))
 
-(defn capacity [seq]
-  (-> seq buffer b/size))
+(defn position [^ASequence a-seq]
+  (.position a-seq))
+
+(defn capacity [^ISequence seq]
+  (if-let [buffer (buffer seq)]
+    (.size buffer)
+    Long/MAX_VALUE))
 
 (defn free-space [seq]
   (- (capacity seq) (size seq)))
 
-(defn take [n seq]
+(defn take [n ^ISequence seq]
   (when (neg? n) (throw (IllegalArgumentException.)))
   (when (> n (size seq)) (throw (java.nio.BufferUnderflowException.)))
   (.take seq n))
 
-(defn drop [n seq]
+(defn drop [n ^ISequence seq]
   (when (neg? n) (throw (IllegalArgumentException.)))
   (when (> n (size seq)) (throw (java.nio.BufferUnderflowException.)))
   (.drop seq n))
 
+(defn expand [n ^ISequence seq]
+  (when (neg? n) (throw (IllegalArgumentException.)))
+  (when (> n (free-space seq)) (throw (java.nio.BufferOverflowException.)))
+  (.expand seq n))
+
+;;
+;; Additional sequence methods
+;;
+
 (defn sequence
-  ([buffer] (.emptySequence buffer))
+  ([^IBuffer buffer] (.sequence buffer 0 0))
   ([buffer size] (expand size (sequence buffer)))
   ([buffer offset size] (drop offset (expand (+ offset size) (sequence buffer)))))
 
@@ -53,11 +59,11 @@
   (when (> n (size seq)) (throw (java.nio.BufferUnderflowException.)))
   (take (- (size seq) n) seq))
 
-(defn expand [n seq]
-  (when (neg? n) (throw (IllegalArgumentException.)))
-  (when (> n (free-space seq)) (throw (java.nio.BufferOverflowException.)))
-  (.expand seq n))
+(defn split [n seq]
+  [(take n seq) (drop n seq)])
 
-
+(defn append [n seq]
+  (let [expanded (expand n seq)]
+    [(take-last n expanded) expanded]))
 
   
