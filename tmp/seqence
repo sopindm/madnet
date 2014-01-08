@@ -4,7 +4,13 @@ interface IBuffer
     int size();
 }
 
-interface ISequence 
+interface IChannel
+{
+    <ISequence, ISequence> read(ISequence data);
+    <ISequence, ISequence> write(ISequence data);
+}
+
+interface ISequence: IChannel
 {
     IBuffer buffer();
 
@@ -13,7 +19,9 @@ interface ISequence
     ISequence expand(int size);
 
     int size();
+}
 
-    Tuple<ISequence, Object> read();
-    ISequence write(Object data);
+class BufferSequence: ISequence
+{
+   
 }

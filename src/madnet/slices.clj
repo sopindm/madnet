@@ -33,6 +33,8 @@
 ;; Slice type
 ;;
 
+(declare read)
+
 (deftype Slice [buffer position size]
   clojure.lang.Seqable
   (seq [this]
