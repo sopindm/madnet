@@ -5,32 +5,57 @@
             BufferUnderflowException
             BufferOverflowException]
            [java.nio.charset Charset]
-           [madnet.sequence IBuffer ISequence ASequence]))
+           [madnet.sequence IBuffer ISequence ASequence]
+           [madnet.util Pair]))
 
 (defmacro ?sequence= [form [position size]]
   `(do (?= (s/position ~form) ~position)
        (?= (s/size ~form) ~size)))
 
-(defn- buffer [size]
-  (reify IBuffer
-    (size [this] size)
-    (sequence [this pos size] (ASequence. this pos size))
-    Object
-    (equals [this obj] (and (isa? (class obj) (class this))
-                            (= (.size ^IBuffer obj) size)))))
+(declare buffer)
 
-(defn- a-sequence [buffer-size position size]
-  (ASequence. (buffer buffer-size) position size))
+(defn- test-sequence [buf pos size]
+  (let [buffer-seq (seq buf)]
+    (proxy [ASequence clojure.lang.Seqable] [buf pos size]
+      (seq [] (clojure.core/seq (take size (drop pos buffer-seq))))
+      (writeImpl [ts]
+        (if (isa? (type ts) clojure.lang.Seqable)
+          (let [write-size (min (s/free-space this) (s/size ts))
+                tseq (take write-size (seq ts))]
+            (Pair. (-> (buffer (s/capacity this)
+                               (concat (take (+ pos size) buffer-seq)
+                                       tseq
+                                       (drop (+ pos size write-size)
+                                             buffer-seq)))
+                       (.sequence pos size)
+                       (.expand write-size))
+                   (s/drop write-size ts))))))))
+
+(defn- buffer [size & [content]]
+  (let [content (concat content (repeat (- size (count content)) nil))]
+    (reify IBuffer
+      (size [this] size)
+      (sequence [this pos size] (test-sequence this pos size))
+      Object
+      (equals [this obj] (and (isa? (class obj) (class this))
+                              (= (seq this) (seq obj))))
+      clojure.lang.Seqable
+      (seq [this] content))))
+
+(defn- a-sequence [buffer-size position size & [content]]
+  (.sequence (buffer buffer-size content) position size))
 
 (deftest making-sequence
   (?sequence= (ASequence. nil 0 100) [0 100])
-  (?sequence= (a-sequence nil 0 100) [0 100])
+  (?sequence= (a-sequence 100 0 100) [0 100])
   (?= (s/buffer (a-sequence 100 0 100)) (buffer 100)))
 
 (deftest sequence-capacity-and-free-space
   (let [s (a-sequence 200 0 100)]
     (?= (s/capacity s) 200)
-    (?= (s/free-space s) 100)))
+    (?= (s/free-space s) 100))
+  (let [s2 (a-sequence 200 100 50)]
+    (?= (s/free-space s2) 50)))
 
 (deftest sequence-modifiers
   (let [s (a-sequence 200 0 100)]
@@ -85,205 +110,71 @@
     (?sequence= (first ss) [120 40])
     (?sequence= (second ss) [0 160])))
 
-(comment
-  (defmacro ?buffer= [expr [pos limit capacity]]
-    `(do (?= (.position ~expr) ~pos)
-         (?= (.limit ~expr) ~limit)
-         (?= (.capacity ~expr) ~capacity)))
+(deftest write-and-read-defaults
+  (?throws (s/write (s/sequence (buffer 200 [])) (ASequence. nil 0 0))
+           UnsupportedOperationException)
+  (?throws (s/write (ASequence. nil 0 0) (s/sequence (buffer 200 [])))
+           UnsupportedOperationException)
+  (?throws (s/read (s/sequence (buffer 200 [])) (ASequence. nil 0 0))
+           UnsupportedOperationException)
+  (?throws (s/read (ASequence. nil 0 0) (s/sequence (buffer 200 [])))
+           UnsupportedOperationException)
+  (let [s (s/sequence (buffer 200 []))
+        [sw writen] (s/write s (a-sequence 3 0 3 [1 2 3]))
+        [sr read] (s/read sw (a-sequence 5 0 2 [1 2]))]
+    (?sequence= sw [0 3])
+    (?sequence= writen [3 0])
+    (?sequence= sr [3 0])
+    (?sequence= read [0 5])
+    (?= (seq sw) [1 2 3])
+    (?= (seq writen) (seq []))
+    (?= (seq sr) (seq []))
+    (?= (seq read) [1 2 1 2 3])))
 
-  (defmacro ?buffers= [expr [& specs]]
-    `(do (?= (clojure.core/count ~expr) ~(clojure.core/count specs))
-         ~@(map-indexed (fn [i spec] `(?buffer= (nth ~expr ~i) ~spec)) specs)))
+(deftest reading-and-writing-multiple-items
+  (let [s (s/sequence (buffer 10 [1 2 3 4 5]) 2 1)
+        [sw sws] (s/write s [(s/sequence (buffer 2 [6 7]) 2)
+                             (s/sequence (buffer 3 [8 9 10]) 3)
+                             (s/sequence (buffer 10) 10)])]
+    (?sequence= sw [2 8])
+    (?= (seq sw) [3 6 7 8 9 10 nil nil])
+    (?= (seq (map seq sws)) [nil nil [nil nil nil nil nil nil nil nil]])
+    (let [[sr srs] (s/read sw [(s/sequence (buffer 2))
+                               (s/sequence (buffer 3))
+                               (s/sequence (buffer 1))
+                               (s/sequence (buffer 10))])]
+      (?sequence= sr [10 0])
+      (?= (seq sr) nil)
+      (?= (seq (map seq srs)) [[3 6] [7 8 9] [10] [nil nil]]))))
+  
+(defn wrong-multiwriting-seq [seq pos size]
+  (letfn [(wsequence [buffer pos size]
+            (proxy [ASequence] [buffer pos size]
+              (writeImpl [seq] (Pair. (s/expand 1 this) (s/drop 1 seq)))))]
+    (.sequence (reify IBuffer
+                 (size [this] (count seq))
+                 (sequence [this pos size] (wsequence this pos size)))
+               pos size)))
 
-  (deftest slice-buffer
-    (let [s (slice (ByteBuffer/allocate 1024))
-          s2 (> s 768)
-          s3 (> s2 256)
-          s4 (< s3 256)]
-      (?buffer= (buffer s) [0 1024 1024])
-      (?buffer= (buffer s2) [768 1024 1024])
-      (?buffer= (buffer s3) [0 0 1024])
-      (?buffer= (buffer s4) [0 256 1024])))
+(deftest multiread-and-multiwrite-errors 
+  (let [s (wrong-multiwriting-seq [1 2 3 4 5] 1 1)
+        [sw sws] (s/write s (map #(wrong-multiwriting-seq % 0 2) [[1 2] [3 4]]))]
+    (?sequence= sw [1 2])
+    (?sequence= (first sws) [1 1])
+    (?sequence= (second sws) [0 2]))
+  (let [s (wrong-multiwriting-seq [1 2 3 4 5] 2 3)
+        [sr srs] (s/read s (map #(wrong-multiwriting-seq % 0 0) [[1 2] [3 4]]))]
+    (?sequence= sr [3 2])
+    (?sequence= (first srs) [0 1])
+    (?sequence= (second srs) [0 0])))
 
-  (deftest slice-buffers
-    (let [s (slice (ByteBuffer/allocate 1024))
-          s2 (> s 768)
-          s3 (> s2 256)
-          s4 (< s2 256)]
-      (?buffers= (buffers s) [[0 1024 1024]])
-      (?buffers= (buffers s2) [[768 1024 1024]])
-      (?buffers= (buffers s3) [])
-      (?buffers= (buffers s4) [[768 1024 1024] [0 256 1024]])))
+(deftest multisequence-test
+  (let [s1 (s/sequence (buffer 5 [1 2 3 4 5]) 3 2)
+        s2 (s/sequence (buffer 3 [6 7 8]) 1 1)
+        s3 (s/sequence (buffer 4 [9 10 11 12]) 0 4)
+        ms (s/multisequence s1 s2 s3)]
+    (?= (s/buffer ms) nil)
+    (?= (s/size ms) 7)
+    (?= (s/free-space ms) 5)))
 
-  (deftest writing-and-reading-for-slices
-    (let [s (slice (ByteBuffer/allocate 1024))]
-      (?slice= (write s (byte-array (map byte (range -128 128))))
-               [256 768 1024])
-      (let [bytes (byte-array 256)]
-        (?slice= (read s bytes) [256 768 1024])
-        (?= (seq bytes) (range -128 128))))
-    (let [s (slice (ByteBuffer/allocate 1024))
-          s2 (< (> s 1000) 24)]
-      (write s2 (byte-array (map byte (range 0 48))))
-      (let [bytes (byte-array 48)]
-        (read s2 bytes)
-        (?= (seq bytes) (range 0 48)))))
-
-  (deftest read-and-write-with-offset-and-size-arguments
-    (let [s (slice (ByteBuffer/allocate 1024))]
-      (write s (byte-array (map byte (range 128))) 64)
-      (let [bytes1 (byte-array 64)
-            bytes2 (byte-array 128)]
-        (read s bytes1)
-        (read s bytes2 64)
-        (?= (seq bytes1) (range 64))
-        (?= (clojure.core/take 64 (seq bytes2)) (range 64))))
-    (let [s (slice (ByteBuffer/allocate 1024))]
-      (write s (byte-array (map byte (range 128))) 64 64)
-      (let [bytes1 (byte-array 64)
-            bytes2 (byte-array 128)
-            bytes3 (byte-array 128)]
-        (read s bytes1)
-        (?= (seq bytes1) (seq (range 64 128)))
-        (read s bytes2 64)
-        (?= (seq (clojure.core/take 64 bytes2)) (seq (range 64 128)))
-        (read s bytes3 64 64)
-        (?= (seq (drop 64 bytes3)) (seq (range 64 128))))))
-
-  (deftest write!-and-read!
-    (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
-      (write! s (byte-array (map byte (range -128 128))))
-      (?slice= @s [0 256 1024])
-      (let [bytes (byte-array 256)]
-        (read! s bytes)
-        (?slice= @s [256 0 1024])
-        (?= (seq bytes) (map byte (range -128 128))))))
-
-  (deftest write!-and-read!-with-size-argument
-    (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
-      (write! s (byte-array (map byte (range 128))) 64)
-      (let [bytes1 (byte-array 64)
-            bytes2 (byte-array 128)]
-        (read @s bytes1)
-        (?= (seq bytes1) (seq (range 64)))
-        (read! s bytes2 64)
-        (?= (seq (clojure.core/take 64 bytes2)) (seq (range 64))))))
-
-  (deftest write!-and-read!-with-offset-argument
-    (let [s (atom (slice (ByteBuffer/allocate 1024) 0))]
-      (write! s (byte-array (map byte (range 128))) 64 64)
-      (let [bytes1 (byte-array 64)
-            bytes2 (byte-array 128)]
-        (read @s bytes1)
-        (?= (seq bytes1) (seq (range 64 128)))
-        (read! s bytes2 64 64)
-        (?= (seq (drop 64 bytes2)) (seq (range 64 128))))))
-
-  (deftest writing-and-reading-for-byte-buffers
-    (let [s1 (slice (ByteBuffer/allocate 1024) 128)
-          s2 (slice (ByteBuffer/allocate 1024))
-          s3 (slice (ByteBuffer/allocate 1024) 128)]
-      (write s1 (byte-array (map byte (range 128))))
-      (write s2 (buffer s1))
-      (let [bytes (byte-array 128)]
-        (read s2 bytes)
-        (?= (seq bytes) (seq (range 128))))
-      (read s2 (buffer s3))
-      (let [bytes (byte-array 128)]
-        (read s3 bytes)
-        (?= (seq bytes) (seq (range 128))))))
-
-  (deftest writing-and-reading-slices-to-slices
-    (let [s1 (slice (ByteBuffer/allocate 1024) 128)
-          s2 (slice (ByteBuffer/allocate 1024) 1000 256)
-          s3 (slice (ByteBuffer/allocate 1024) 128)]
-      (write s1 (byte-array (map byte (range 128))))
-      (write s2 s1 128)
-      (read s1 s2 128 128)
-      (write s3 s2 128 128)
-      (let [bytes1 (byte-array 128)
-            bytes2 (byte-array 256)
-            bytes3 (byte-array 128)]
-        (read s1 bytes1)
-        (?= (seq bytes1) (seq (range 128)))
-        (read s2 bytes2)
-        (?= (seq bytes2) (seq (concat (range 128) (range 128))))
-        (read s3 bytes3)
-        (?= (seq bytes3) (seq (range 128))))))
-
-  (deftest slices-read-and-write-exceptions
-    (let [s1 (slice (ByteBuffer/allocate 1024) 512)
-          s2 (slice (ByteBuffer/allocate 1024) 768 512)]
-      (?throws (write s1 (byte-array 1024)) BufferOverflowException)
-      (?throws (read s1 (byte-array 1024)) BufferUnderflowException)
-      (?throws (write s2 (byte-array 513)) BufferOverflowException)
-      (?throws (read s2 (byte-array 513)) BufferUnderflowException)))
-
-  (deftest slices-seq-writing
-    (let [s (slice (ByteBuffer/allocate 1024))]
-      (write s (range -128 128))
-      (let [bytes (byte-array 256)]
-        (read s bytes)
-        (?= (seq bytes) (seq (range -128 128))))))
-
-  (deftest slice-random-access
-    (let [s (slice (ByteBuffer/allocate 256) 128 256)]
-      (write s (range -128 128))
-      (?= (seq (for [i (range 0 256)]
-                 (get s i)))
-          (seq (range -128 128)))
-      (?throws (get s -1) IndexOutOfBoundsException)
-      (?throws (get s 256) IndexOutOfBoundsException)))
-
-  (deftest slice-to-seq
-    (let [s (slice (ByteBuffer/allocate 256) 128 256)]
-      (write s (range -128 128))
-      (?= (seq s)
-          (seq (range -128 128)))))
-
-  (deftest slices-for-char-buffers
-    (let [s (slice (CharBuffer/allocate 256))
-          string (clojure.core/take 256 (cycle "abc"))]
-      (write s (char-array string))
-      (?= (seq s) (seq string))
-      (let [chars (char-array 256)]
-        (read s chars)
-        (?= (seq chars) (seq string)))
-      (let [s2 (slice (CharBuffer/allocate 256))]
-        (read s s2)
-        (?= (seq s2) (seq string)))))
-
-  (deftest char-slices-to-bytes
-    (let [bs (slice (ByteBuffer/allocate 256))
-          cs (slice (CharBuffer/allocate 256))
-          string (seq "some string")] 
-      (write cs string)
-      (write bs cs)
-      (?= (seq (clojure.core/take (count string) bs))
-          (seq (map byte string)))
-      (let [moved-slice (< (> bs 255) 100)]
-        (write moved-slice cs (count string))
-        (?= (seq (clojure.core/take (count string) moved-slice))
-            (seq (map byte string))))))
-
-  (comment 
-    (deftest multibyte-chars-to-bytes
-      (let [bs (slice (ByteBuffer/allocate 256))
-            cs (slice (CharBuffer/allocate 256))
-            string (seq "\u1100\u1101\u1102\u1103")
-            bytes [-31 -124 -128 -31 -124 -127 -31 -124 -126 -31 -124 -125]]
-        (write cs string)
-        (write bs cs)
-        (?= (seq (clojure.core/take 12 (seq bs))) bytes)
-        (let [moved-slice (< (> bs 253) 253)]
-          (write moved-slice cs)
-          (?= (seq (clojure.core/take 12 (seq moved-slice)))
-              bytes))
-        (let [moved-slice (< (> bs 255) 255)]
-          (write moved-slice cs)
-          (?= (seq (clojure.core/take 12 (seq moved-slice)))
-              bytes))))))
-
-
-
-
+;multisequence and circular sequence

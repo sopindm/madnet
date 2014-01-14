@@ -1,8 +1,9 @@
 (ns madnet.sequence
-  (:refer-clojure :exclude [take drop sequence take-last drop-last])
+  (:refer-clojure :exclude [take drop sequence take-last drop-last read])
   (:import [java.nio Buffer ByteBuffer CharBuffer]
            [java.nio.charset Charset]
-           [madnet.sequence IBuffer ISequence ASequence]))
+           [madnet.sequence IBuffer ISequence ASequence Multisequence]
+           [madnet.util Pair]))
 
 ;;
 ;; ISequence and ASequence method wrappers
@@ -23,7 +24,7 @@
     Long/MAX_VALUE))
 
 (defn free-space [seq]
-  (- (capacity seq) (size seq)))
+  (.freeSpace seq))
 
 (defn take [n ^ISequence seq]
   (when (neg? n) (throw (IllegalArgumentException.)))
@@ -39,6 +40,9 @@
   (when (neg? n) (throw (IllegalArgumentException.)))
   (when (> n (free-space seq)) (throw (java.nio.BufferOverflowException.)))
   (.expand seq n))
+
+(defn multisequence [& seqs]
+  (Multisequence. seqs))
 
 ;;
 ;; Additional sequence methods
@@ -66,4 +70,15 @@
   (let [expanded (expand n seq)]
     [(take-last n expanded) expanded]))
 
-  
+;;
+;; Reading/writing
+;;
+
+(defn write [dest src]
+  (let [pair (.write dest src)]
+    [(.first pair) (.second pair)]))
+
+(defn read [dest src]
+  (let [pair (.read dest src)]
+    [(.first pair) (.second pair)]))
+

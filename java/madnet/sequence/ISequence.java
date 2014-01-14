@@ -1,13 +1,25 @@
 package madnet.sequence;
 
-public interface ISequence
+import madnet.util.Pair;
+
+public abstract class ISequence
 {
-    IBuffer buffer();
+    abstract public IBuffer buffer();
 
-    long size();
+    abstract public int size();
+    abstract public int freeSpace();
 
-    ISequence take(long n);
-    ISequence drop(long n);
+    abstract public ISequence take(int n);
+    abstract public ISequence drop(int n);
 
-    ISequence expand(long size);
+    abstract public ISequence expand(int size);
+
+    abstract public Pair<ISequence, ISequence> read(ISequence seq);
+    abstract public Pair<ISequence, Iterable<ISequence>> read(Iterable<ISequence> seq);
+
+    abstract public Pair<ISequence, ISequence> write(ISequence seq);
+    abstract public Pair<ISequence, Iterable<ISequence>> write(Iterable<ISequence> seq);
+
+    abstract protected Pair<ISequence, ISequence> readImpl(ISequence seq);
+    abstract protected Pair<ISequence, ISequence> writeImpl(ISequence seq);
 }
