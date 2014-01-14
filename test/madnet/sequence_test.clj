@@ -5,7 +5,7 @@
             BufferUnderflowException
             BufferOverflowException]
            [java.nio.charset Charset]
-           [madnet.sequence IBuffer ISequence ASequence]
+           [madnet.sequence IBuffer ISequence ASequence CircularSequence]
            [madnet.util Pair]))
 
 (defmacro ?sequence= [form [position size]]
@@ -168,13 +168,34 @@
     (?sequence= (first srs) [0 1])
     (?sequence= (second srs) [0 0])))
 
-(deftest multisequence-test
-  (let [s1 (s/sequence (buffer 5 [1 2 3 4 5]) 3 2)
-        s2 (s/sequence (buffer 3 [6 7 8]) 1 1)
-        s3 (s/sequence (buffer 4 [9 10 11 12]) 0 4)
-        ms (s/multisequence s1 s2 s3)]
-    (?= (s/buffer ms) nil)
-    (?= (s/size ms) 7)
-    (?= (s/free-space ms) 5)))
+(deftest circular-sequence-metrics
+  (let [s (s/sequence (buffer 5) 2 2)
+        cs (s/circular-sequence s)]
+    (?= (s/buffer cs) (s/buffer s))
+    (?= (s/size cs) 2)
+    (?= (s/free-space cs) 3)))
 
-;multisequence and circular sequence
+(deftest circular-sequence-with-null-buffer
+  (?throws (s/circular-sequence (ASequence. nil 0 100)) IllegalArgumentException 
+           "Sequence must have buffer"))
+
+(deftest circular-sequence-take-drop-and-expand
+  (let [s (s/circular-sequence (s/sequence (buffer 5) 2 2))
+        s2 (s/expand 2 s)]
+    (?true (isa? (type (s/take 1 s)) CircularSequence))
+    (?true (isa? (type (s/drop 3 s2)) CircularSequence))
+    (?= (s/size s2) 4)
+    (?= (s/free-space s2) 1)
+    (?= (s/size (s/take 3 s2)) 3)
+    (?= (s/free-space (s/take 3 s2)) 2)
+    (?throws (s/take 4 (s/take 3 s2)) BufferUnderflowException)
+    (?throws (s/drop 4 (s/take 3 s2)) BufferUnderflowException)
+    (?= (s/size (s/drop 3 s2)) 1)
+    (?= (s/free-space (s/drop 3 s2)) 4)))
+        
+;circular sequence read/write
+
+;clojure collections as buffers
+;clojure collections as sequencies
+
+;mutable sequence functions

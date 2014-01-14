@@ -36,19 +36,19 @@ public class ASequence extends ISequence
         return buffer().size() - position() - size();
     }
 
-    public ISequence take(int n)
+    public ASequence take(int n)
     {
-        return buffer.sequence(position, n);
+        return (ASequence)buffer.sequence(position, n);
     }
 
-    public ISequence drop(int n)
+    public ASequence drop(int n)
     {
-        return buffer.sequence(position + n, size - n);
+        return (ASequence)buffer.sequence(position + n, size - n);
     }
 
-    public ISequence expand(int n)
+    public ASequence expand(int n)
     {
-        return buffer.sequence(position, size + n);
+        return (ASequence)buffer.sequence(position, size + n);
     }
 
     public Pair<ISequence, ISequence> read(ISequence seq)

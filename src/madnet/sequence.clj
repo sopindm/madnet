@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [take drop sequence take-last drop-last read])
   (:import [java.nio Buffer ByteBuffer CharBuffer]
            [java.nio.charset Charset]
-           [madnet.sequence IBuffer ISequence ASequence Multisequence]
+           [madnet.sequence IBuffer ISequence ASequence CircularSequence]
            [madnet.util Pair]))
 
 ;;
@@ -41,8 +41,8 @@
   (when (> n (free-space seq)) (throw (java.nio.BufferOverflowException.)))
   (.expand seq n))
 
-(defn multisequence [& seqs]
-  (Multisequence. seqs))
+(defn circular-sequence [seq]
+  (CircularSequence. seq))
 
 ;;
 ;; Additional sequence methods
