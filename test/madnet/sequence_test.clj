@@ -14,9 +14,9 @@
 
 (declare buffer)
 
-(defn- test-sequence [buf pos size]
+(defn- test-sequence [buf pos size limit]
   (let [buffer-seq (seq buf)]
-    (proxy [ASequence clojure.lang.Seqable] [buf pos size]
+    (proxy [ASequence clojure.lang.Seqable] [buf pos size limit]
       (seq [] (clojure.core/seq (take size (drop pos buffer-seq))))
       (writeImpl [ts]
         (if (isa? (type ts) clojure.lang.Seqable)
@@ -27,7 +27,7 @@
                                        tseq
                                        (drop (+ pos size write-size)
                                              buffer-seq)))
-                       (.sequence pos size)
+                       (.sequence pos size (count buffer-seq))
                        (.expand write-size))
                    (s/drop write-size ts))))))))
 
@@ -35,7 +35,7 @@
   (let [content (concat content (repeat (- size (count content)) nil))]
     (reify IBuffer
       (size [this] size)
-      (sequence [this pos size] (test-sequence this pos size))
+      (sequence [this pos size limit] (test-sequence this pos size limit))
       Object
       (equals [this obj] (and (isa? (class obj) (class this))
                               (= (seq this) (seq obj))))
@@ -43,10 +43,10 @@
       (seq [this] content))))
 
 (defn- a-sequence [buffer-size position size & [content]]
-  (.sequence (buffer buffer-size content) position size))
+  (.sequence (buffer buffer-size content) position size buffer-size))
 
 (deftest making-sequence
-  (?sequence= (ASequence. nil 0 100) [0 100])
+  (?sequence= (ASequence. nil 0 100 100) [0 100])
   (?sequence= (a-sequence 100 0 100) [0 100])
   (?= (s/buffer (a-sequence 100 0 100)) (buffer 100)))
 
@@ -111,13 +111,13 @@
     (?sequence= (second ss) [0 160])))
 
 (deftest write-and-read-defaults
-  (?throws (s/write (s/sequence (buffer 200 [])) (ASequence. nil 0 0))
+  (?throws (s/write (s/sequence (buffer 200 [])) (ASequence. nil 0 0 0))
            UnsupportedOperationException)
-  (?throws (s/write (ASequence. nil 0 0) (s/sequence (buffer 200 [])))
+  (?throws (s/write (ASequence. nil 0 0 0) (s/sequence (buffer 200 [])))
            UnsupportedOperationException)
-  (?throws (s/read (s/sequence (buffer 200 [])) (ASequence. nil 0 0))
+  (?throws (s/read (s/sequence (buffer 200 [])) (ASequence. nil 0 0 0))
            UnsupportedOperationException)
-  (?throws (s/read (ASequence. nil 0 0) (s/sequence (buffer 200 [])))
+  (?throws (s/read (ASequence. nil 0 0 0) (s/sequence (buffer 200 [])))
            UnsupportedOperationException)
   (let [s (s/sequence (buffer 200 []))
         [sw writen] (s/write s (a-sequence 3 0 3 [1 2 3]))
@@ -148,13 +148,13 @@
       (?= (seq (map seq srs)) [[3 6] [7 8 9] [10] [nil nil]]))))
   
 (defn wrong-multiwriting-seq [seq pos size]
-  (letfn [(wsequence [buffer pos size]
-            (proxy [ASequence] [buffer pos size]
+  (letfn [(wsequence [buffer pos size limit]
+            (proxy [ASequence] [buffer pos size limit]
               (writeImpl [seq] (Pair. (s/expand 1 this) (s/drop 1 seq)))))]
     (.sequence (reify IBuffer
                  (size [this] (count seq))
-                 (sequence [this pos size] (wsequence this pos size)))
-               pos size)))
+                 (sequence [this pos size limit] (wsequence this pos size limit)))
+               pos size (count seq))))
 
 (deftest multiread-and-multiwrite-errors 
   (let [s (wrong-multiwriting-seq [1 2 3 4 5] 1 1)
@@ -176,7 +176,7 @@
     (?= (s/free-space cs) 3)))
 
 (deftest circular-sequence-with-null-buffer
-  (?throws (s/circular-sequence (ASequence. nil 0 100)) IllegalArgumentException 
+  (?throws (s/circular-sequence (ASequence. nil 0 100 100)) IllegalArgumentException 
            "Sequence must have buffer"))
 
 (deftest circular-sequence-take-drop-and-expand
@@ -230,8 +230,7 @@
 
 (deftest circular-sequencies-write
   (let [s (s/circular-sequence (s/sequence (buffer 5 [1 2 3 4 5]) 2 0))
-        s2 (s/expand 2 s)
-        s3 (s/expand 1 s)]
+        s2 (s/expand 2 s)]
     (let [[writen sw] (s/write s (s/sequence (buffer 2 [6 7]) 0 2))]
       (?sequence= sw [2 0])
       (?= (s/size writen) 2)
@@ -241,7 +240,14 @@
       (?sequence= sw [2 0])
       (?= (s/size writen) 4)
       (?= (s/free-space writen) 1)
-      (?= (seq (mapcat seq (.sequencies writen))) [3 4 6 7]))))
+      (?= (seq (mapcat seq (.sequencies writen))) [3 4 6 7]))
+    (let [[writen sw] (s/write s2 (s/sequence (buffer 5 (range 5)) 0 5))]
+      (?sequence= sw [3 2])
+      (?= (seq (mapcat seq (.sequencies writen))) [3 4 0 1 2]))
+    (let [[writen sw] (s/write (s/expand 2 s2)
+                               (s/sequence (buffer 5 (range 5)) 0 5))]
+      (?sequence= sw [1 4])
+      (?= (seq (mapcat seq (.sequencies writen))) [3 4 5 1 0]))))
 
 ;reading/writing multiple seq's
 ;reading/writing circulars to circular

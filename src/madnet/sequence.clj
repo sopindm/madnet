@@ -49,7 +49,7 @@
 ;;
 
 (defn sequence
-  ([^IBuffer buffer] (.sequence buffer 0 0))
+  ([^IBuffer buffer] (.sequence buffer 0 0 (.size buffer)))
   ([buffer size] (expand size (sequence buffer)))
   ([buffer offset size] (drop offset (expand (+ offset size) (sequence buffer)))))
 

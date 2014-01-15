@@ -8,12 +8,14 @@ public class ASequence extends ISequence
     private final IBuffer buffer;
     private final int position;
     private final int size;
+    private final int limit;
 
-    public ASequence(IBuffer buffer, int position, int size)
+    public ASequence(IBuffer buffer, int position, int size, int limit)
     {
         this.buffer = buffer;
         this.position = position;
         this.size = size;
+        this.limit = limit;
     }
 
     public IBuffer buffer()
@@ -33,22 +35,32 @@ public class ASequence extends ISequence
 
     public int freeSpace() 
     {
-        return buffer().size() - position() - size();
+        return limit - position() - size();
+    }
+
+    public int limit()
+    {
+        return limit;
+    }
+
+    public ASequence limit(int newLimit)
+    {
+        return (ASequence)buffer.sequence(position, size, newLimit);
     }
 
     public ASequence take(int n)
     {
-        return (ASequence)buffer.sequence(position, n);
+        return (ASequence)buffer.sequence(position, n, limit);
     }
 
     public ASequence drop(int n)
     {
-        return (ASequence)buffer.sequence(position + n, size - n);
+        return (ASequence)buffer.sequence(position + n, size - n, limit);
     }
 
     public ASequence expand(int n)
     {
-        return (ASequence)buffer.sequence(position, size + n);
+        return (ASequence)buffer.sequence(position, size + n, limit);
     }
 
     public Pair<ISequence, ISequence> read(ISequence seq)

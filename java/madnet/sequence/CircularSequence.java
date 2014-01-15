@@ -6,8 +6,8 @@ import madnet.util.Pair;
 
 public class CircularSequence extends ISequence
 {
-    private ASequence reader;
-    private ASequence writer;
+    final private ASequence reader;
+    final private ASequence writer;
 
     public CircularSequence(ASequence sequence)
     {
@@ -60,9 +60,9 @@ public class CircularSequence extends ISequence
     public int freeSpace()
     {
         if(writer != null)
-            return reader.buffer().size() - reader.size() - writer.size();
+            return reader.freeSpace() + writer.freeSpace();
 
-        return reader.buffer().size() - reader.size();
+        return reader.freeSpace() + reader.position();
     }
 
     public ISequence take(int n)
@@ -75,10 +75,14 @@ public class CircularSequence extends ISequence
 
     public ISequence drop(int n)
     {
-        if(reader.size() >= n)
-            return new CircularSequence(reader.drop(n), writer);
+        ASequence newWriter = writer;
+        if(newWriter != null)
+            newWriter = newWriter.limit(Math.min(writer.limit() + n, buffer().size()));
 
-        return new CircularSequence(writer.drop(n - reader.size()), null);
+        if(reader.size() >= n)
+            return new CircularSequence(reader.drop(n), newWriter);
+
+        return new CircularSequence(newWriter.drop(n - reader.size()), null);
     }
 
     public ISequence expand(int n)
@@ -90,16 +94,33 @@ public class CircularSequence extends ISequence
             return new CircularSequence(reader, (ASequence)writer.expand(n));
 
         return new CircularSequence(reader.expand(reader.freeSpace()),
-                                    (ASequence)reader.buffer().sequence(0, n - reader.freeSpace()));
+                                    (ASequence)reader.buffer().sequence(0, n - reader.freeSpace(), reader.position()));
     }
 
     public Pair<ISequence, ISequence> write(ISequence seq) 
     {
-        if(writer == null) {
+        if(writer == null && reader.freeSpace() > seq.size()) 
+        {
             Pair<ISequence, ISequence> writen = reader.write(seq);
             return new Pair<ISequence, ISequence>
                 (new CircularSequence((ASequence)writen.first, null),
                  writen.second);
+        }
+        else if(writer == null) 
+        {
+            ArrayList<ISequence> seqs = new ArrayList<ISequence>();
+            seqs.add(reader);
+            seqs.add((ASequence)reader.buffer().sequence(0, 0, reader.position()));
+
+            Pair<ISequence, Iterable<ISequence>> read = seq.read(seqs);
+            Iterator<ISequence> iter = read.second.iterator();
+
+            ASequence newReader= (ASequence)iter.next();
+            ASequence newWriter= ((ASequence)iter.next()).limit(newReader.position());
+
+            return new Pair<ISequence, ISequence>
+                (new CircularSequence(newReader, newWriter),
+                 read.first);
         }
 
         Pair<ISequence, ISequence> writen = writer.write(seq);
@@ -123,7 +144,7 @@ public class CircularSequence extends ISequence
     {
         if(writer != null)
         {
-            ArrayList<ISequence> seqs = new ArrayList<ISequence>(2);
+            ArrayList<ISequence> seqs = new ArrayList<ISequence>();
             seqs.add(reader);
             seqs.add(writer);
 
@@ -131,7 +152,7 @@ public class CircularSequence extends ISequence
             Iterator<ISequence> iter = writen.second.iterator();
 
             ASequence newReader = (ASequence)iter.next();
-            ASequence newWriter = (ASequence)iter.next();
+            ASequence newWriter = ((ASequence)iter.next()).limit(newReader.position());
 
             return new Pair<ISequence, ISequence>
                 (new CircularSequence(newReader, newWriter),
