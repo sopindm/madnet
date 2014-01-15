@@ -193,6 +193,59 @@
     (?= (s/size (s/drop 3 s2)) 1)
     (?= (s/free-space (s/drop 3 s2)) 4)))
         
+(deftest circular-sequence-sequencies
+  (let [s (s/circular-sequence (s/sequence (buffer 5) 2 2))
+        ss (.sequencies s)]
+    (?= (count ss) 1)
+    (?sequence= (first ss) [2 2])
+    (let [s2 (s/expand 2 s)
+          ss (.sequencies s2)]
+      (?= (count ss) 2)
+      (?sequence= (first ss) [2 3])
+      (?sequence= (second ss) [0 1])
+      (let [ss1 (.sequencies (s/drop 3 s2))
+            ss2 (.sequencies (s/take 3 s2))]
+        (?= (count ss1) 1)
+        (?sequence= (first ss1) [0 1])
+        (?= (count ss2) 1)
+        (?sequence= (first ss2) [2 3])))))
+
+(deftest circular-sequencies-read
+  (let [s (s/circular-sequence (s/sequence (buffer 5 [1 2 3 4 5]) 2 2))
+        s2 (s/expand 2 s)
+        s3 (s/expand 3 s)]
+    (let [[read sr] (s/read s (s/sequence (buffer 5) 0 0))]
+      (?sequence= sr [0 2])
+      (?= (seq sr) [3 4])
+      (?= (s/size read) 0)
+      (?= (s/free-space read) 5))
+    (let [[read sr] (s/read s2 (s/sequence (buffer 5) 0 0))]
+      (?sequence= sr [0 4])
+      (?= (seq sr) [3 4 5 1])
+      (?= (s/size read) 0)
+      (?= (s/free-space read) 5))
+    (let [[read sr] (s/read s3 (s/sequence (buffer 4) 0 0))
+          [_ sr] (s/read read (s/sequence (buffer 5) 0 0))]
+      (?= (seq sr) [2]))))
+
+(deftest circular-sequencies-write
+  (let [s (s/circular-sequence (s/sequence (buffer 5 [1 2 3 4 5]) 2 0))
+        s2 (s/expand 2 s)
+        s3 (s/expand 1 s)]
+    (let [[writen sw] (s/write s (s/sequence (buffer 2 [6 7]) 0 2))]
+      (?sequence= sw [2 0])
+      (?= (s/size writen) 2)
+      (?= (s/free-space writen) 3)
+      (?= (seq (mapcat seq (.sequencies writen))) [6 7]))
+    (let [[writen sw] (s/write s2 (s/sequence (buffer 2 [6 7]) 0 2))]
+      (?sequence= sw [2 0])
+      (?= (s/size writen) 4)
+      (?= (s/free-space writen) 1)
+      (?= (seq (mapcat seq (.sequencies writen))) [3 4 6 7]))))
+
+;reading/writing multiple seq's
+;reading/writing circulars to circular
+
 ;circular sequence read/write
 
 ;clojure collections as buffers

@@ -81,4 +81,3 @@
 (defn read [dest src]
   (let [pair (.read dest src)]
     [(.first pair) (.second pair)]))
-

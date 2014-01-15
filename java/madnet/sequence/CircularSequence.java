@@ -1,5 +1,7 @@
 package madnet.sequence;
 
+import java.util.Iterator;
+import java.util.ArrayList;
 import madnet.util.Pair;
 
 public class CircularSequence extends ISequence
@@ -18,8 +20,28 @@ public class CircularSequence extends ISequence
 
     private CircularSequence(ASequence reader, ASequence writer)
     {
-        this.reader = reader;
-        this.writer = writer;
+        if(reader.size() == 0 && writer != null)
+        {
+            this.reader = writer;
+            this.writer = null;
+        }
+        else
+        {
+            this.reader = reader;
+            this.writer = writer;
+        }
+    }
+
+    public ASequence[] sequencies() 
+    {
+        if(writer != null)
+        {
+            ASequence[] ret = {reader, writer};
+            return ret;
+        }
+
+        ASequence[] ret = {reader};
+        return ret;
     }
 
     public IBuffer buffer()
@@ -73,7 +95,18 @@ public class CircularSequence extends ISequence
 
     public Pair<ISequence, ISequence> write(ISequence seq) 
     {
-        throw new UnsupportedOperationException();
+        if(writer == null) {
+            Pair<ISequence, ISequence> writen = reader.write(seq);
+            return new Pair<ISequence, ISequence>
+                (new CircularSequence((ASequence)writen.first, null),
+                 writen.second);
+        }
+
+        Pair<ISequence, ISequence> writen = writer.write(seq);
+
+        return new Pair<ISequence, ISequence>
+            (new CircularSequence(reader, (ASequence)writen.first),
+             writen.second);
     }
 
     public Pair<ISequence, Iterable<ISequence>> write(Iterable<ISequence> seq) 
@@ -88,7 +121,28 @@ public class CircularSequence extends ISequence
 
     public Pair<ISequence, ISequence> read(ISequence seq) 
     {
-        throw new UnsupportedOperationException();
+        if(writer != null)
+        {
+            ArrayList<ISequence> seqs = new ArrayList<ISequence>(2);
+            seqs.add(reader);
+            seqs.add(writer);
+
+            Pair<ISequence, Iterable<ISequence>> writen = seq.write(seqs);
+            Iterator<ISequence> iter = writen.second.iterator();
+
+            ASequence newReader = (ASequence)iter.next();
+            ASequence newWriter = (ASequence)iter.next();
+
+            return new Pair<ISequence, ISequence>
+                (new CircularSequence(newReader, newWriter),
+                 writen.first);
+        }
+
+        Pair<ISequence, ISequence> read = reader.read(seq);
+
+        return new Pair<ISequence, ISequence>
+            (new CircularSequence((ASequence)read.first, null),
+             read.second);
     }
 
     public Pair<ISequence, Iterable<ISequence>> read(Iterable<ISequence> seq) 
