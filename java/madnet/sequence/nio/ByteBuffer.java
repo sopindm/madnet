@@ -18,8 +18,8 @@ public class ByteBuffer implements IBuffer
         return this.size;
     }
 
-    public ISequence sequence(int offset, int size)
+    public ISequence sequence(int offset, int size, int limit)
     {
-        return new ASequence(this, offset, size);
+        return new ASequence(this, offset, size, limit);
     }
 }

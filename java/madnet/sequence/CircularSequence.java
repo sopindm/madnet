@@ -15,15 +15,15 @@ public class CircularSequence extends ISequence
             throw new IllegalArgumentException("Sequence must have buffer");
 
         reader = sequence;
-        writer = null;
+        writer = (ASequence)sequence.buffer().sequence(0, 0, sequence.position());
     }
 
     private CircularSequence(ASequence reader, ASequence writer)
     {
-        if(reader.size() == 0 && writer != null)
+        if(reader.size() == 0 && reader.freeSpace() == 0)
         {
             this.reader = writer;
-            this.writer = null;
+            this.writer = (ASequence)reader.buffer().sequence(0, 0, writer.position());
         }
         else
         {
@@ -32,9 +32,29 @@ public class CircularSequence extends ISequence
         }
     }
 
+    public int limit() 
+    {
+        if(reader.limit() < buffer().size())
+            return reader.limit();
+
+        return reader.limit() - reader.position() + writer.limit();
+    }
+
+    public CircularSequence limit(int newLimit)
+    {
+        int readerRemains = buffer().size() - reader.position();
+
+        if(newLimit < readerRemains)
+            return new CircularSequence(reader.limit(reader.position() + newLimit),
+                                        writer.limit(0));
+
+        return new CircularSequence(reader.limit(buffer().size()),
+                                    writer.limit(newLimit - readerRemains));
+    }
+
     public ASequence[] sequencies() 
     {
-        if(writer != null)
+        if(writer.size() > 0)
         {
             ASequence[] ret = {reader, writer};
             return ret;
@@ -67,50 +87,41 @@ public class CircularSequence extends ISequence
 
     public ISequence take(int n)
     {
-        if(reader.size() >= n)
-            return new CircularSequence(reader.take(n), null);
+        int readerTake = Math.min(n, reader.size());
+        int writerTake = n - readerTake;
 
-        return new CircularSequence(reader, writer.take(n - reader.size()));
+        return new CircularSequence(reader.take(readerTake), writer.take(writerTake));
     }
 
     public ISequence drop(int n)
     {
-        ASequence newWriter = writer;
-        if(newWriter != null)
-            newWriter = newWriter.limit(Math.min(writer.limit() + n, buffer().size()));
+        int readerDrop = Math.min(n, reader.size());
+        int writerDrop = n - readerDrop;
 
-        if(reader.size() >= n)
-            return new CircularSequence(reader.drop(n), newWriter);
+        int writerLimit = writer.limit() + Math.max(0, n - reader.freeSpace());
 
-        return new CircularSequence(newWriter.drop(n - reader.size()), null);
+        ASequence newReader = reader.drop(readerDrop);
+        ASequence newWriter = writer.drop(writerDrop).limit(writerLimit);
+
+        return new CircularSequence(newReader, newWriter);
     }
 
     public ISequence expand(int n)
     {
-        if(reader.freeSpace() >= n)
-            return new CircularSequence((ASequence)reader.expand(n));
+        int readerExpand = Math.min(n, reader.freeSpace());
+        int writerExpand = n - readerExpand;
 
-        if(writer != null)
-            return new CircularSequence(reader, (ASequence)writer.expand(n));
-
-        return new CircularSequence(reader.expand(reader.freeSpace()),
-                                    (ASequence)reader.buffer().sequence(0, n - reader.freeSpace(), reader.position()));
+        return new CircularSequence(reader.expand(readerExpand),
+                                    writer.expand(writerExpand));
     }
 
     public Pair<ISequence, ISequence> write(ISequence seq) 
     {
-        if(writer == null && reader.freeSpace() > seq.size()) 
-        {
-            Pair<ISequence, ISequence> writen = reader.write(seq);
-            return new Pair<ISequence, ISequence>
-                (new CircularSequence((ASequence)writen.first, null),
-                 writen.second);
-        }
-        else if(writer == null) 
+        if(reader.freeSpace() > 0)
         {
             ArrayList<ISequence> seqs = new ArrayList<ISequence>();
             seqs.add(reader);
-            seqs.add((ASequence)reader.buffer().sequence(0, 0, reader.position()));
+            seqs.add(writer);
 
             Pair<ISequence, Iterable<ISequence>> read = seq.read(seqs);
             Iterator<ISequence> iter = read.second.iterator();

@@ -45,6 +45,12 @@ public class ASequence extends ISequence
 
     public ASequence limit(int newLimit)
     {
+        if(newLimit > buffer.size())
+            throw new IllegalArgumentException("Limit too much");
+
+        if(newLimit < position() + size())
+            throw new IllegalArgumentException("Limit too low");
+
         return (ASequence)buffer.sequence(position, size, newLimit);
     }
 

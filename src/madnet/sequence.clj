@@ -19,9 +19,10 @@
   (.position a-seq))
 
 (defn capacity [^ISequence seq]
-  (if-let [buffer (buffer seq)]
-    (.size buffer)
-    Long/MAX_VALUE))
+  (.limit seq))
+
+(defn limit [n ^ISequence seq]
+  (.limit seq n))
 
 (defn free-space [seq]
   (.freeSpace seq))
