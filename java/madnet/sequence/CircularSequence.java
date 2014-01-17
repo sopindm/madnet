@@ -14,7 +14,7 @@ public class CircularSequence extends ISequence
         if(sequence.buffer() == null)
             throw new IllegalArgumentException("Sequence must have buffer");
 
-        reader = sequence;
+        reader = sequence.limit(sequence.buffer().size());
         writer = (ASequence)sequence.buffer().sequence(0, 0, sequence.position());
     }
 
@@ -30,26 +30,6 @@ public class CircularSequence extends ISequence
             this.reader = reader;
             this.writer = writer;
         }
-    }
-
-    public int limit() 
-    {
-        if(reader.limit() < buffer().size())
-            return reader.limit();
-
-        return reader.limit() - reader.position() + writer.limit();
-    }
-
-    public CircularSequence limit(int newLimit)
-    {
-        int readerRemains = buffer().size() - reader.position();
-
-        if(newLimit < readerRemains)
-            return new CircularSequence(reader.limit(reader.position() + newLimit),
-                                        writer.limit(0));
-
-        return new CircularSequence(reader.limit(buffer().size()),
-                                    writer.limit(newLimit - readerRemains));
     }
 
     public ASequence[] sequencies() 

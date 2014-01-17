@@ -54,14 +54,14 @@
   (let [s (a-sequence 200 0 100)]
     (?= (s/capacity s) 200)
     (?= (s/free-space s) 100)
-    (?= (s/capacity (s/limit 150 s)) 150))
+    (?= (s/capacity (.limit s 150)) 150))
   (let [s2 (a-sequence 200 100 50)]
     (?= (s/free-space s2) 50)))
   
 (deftest sequence-limiting-exceptions
   (let [s (a-sequence 200 100 50)]
-    (?throws (s/limit 300 s) IllegalArgumentException "Limit too much")
-    (?throws (s/limit 149 s) IllegalArgumentException "Limit too low")))
+    (?throws (.limit s 300) IllegalArgumentException "Limit too much")
+    (?throws (.limit s 149) IllegalArgumentException "Limit too low")))
 
 (deftest sequence-modifiers
   (let [s (a-sequence 200 0 100)]
@@ -73,13 +73,13 @@
     (?= (s/buffer (s/expand 100 s)) (s/buffer s))))
 
 (deftest sequence-limits-with-take-drop-and-expand
-  (let [s (s/limit 190 (a-sequence 200 0 100))]
+  (let [s (.limit (a-sequence 200 0 100) 190)]
     (?= (s/capacity (s/take 10 s)) 190)
-    (?= (s/capacity (s/drop 10 s)) 190)
+    (?= (s/capacity (s/drop 10 s)) 180)
     (?= (s/capacity (s/expand 10 s)) 190)))
 
 (deftest take-drop-and-expand-exceptions
-  (let [s (s/limit 200 (a-sequence 500 0 100))]
+  (let [s (.limit (a-sequence 500 0 100) 200)]
     (?throws (s/take -1 s) IllegalArgumentException)
     (?throws (s/take 150 s) BufferUnderflowException)
     (?throws (s/drop -1 s) IllegalArgumentException)
@@ -186,8 +186,7 @@
     (?= (s/buffer cs) (s/buffer s))
     (?= (s/size cs) 2)
     (?= (s/free-space cs) 3)
-    (?= (s/capacity cs) 5)
-    (?= (s/capacity (s/limit 3 cs)) 3)))
+    (?= (s/capacity cs) 5)))
 
 (deftest circular-sequence-with-null-buffer
   (?throws (s/circular-sequence (ASequence. nil 0 100 100)) IllegalArgumentException 
@@ -207,8 +206,6 @@
     (?= (s/size (s/drop 3 s2)) 1)
     (?= (s/free-space (s/drop 3 s2)) 4)))
 
-;limit with take, expand and drop (2 cases)
-        
 (deftest circular-sequence-sequencies
   (let [s (s/circular-sequence (s/sequence (buffer 5) 2 2))
         ss (.sequencies s)]
@@ -265,9 +262,10 @@
       (?sequence= sw [1 4])
       (?= (seq (mapcat seq (.sequencies writen))) [3 4 5 1 0]))))
 
-;write to limited circular sequencies
+;mutable sequence functions
+;sequencies access (random or sequential)
 
 ;clojure collections as buffers
 ;clojure collections as sequencies
 
-;mutable sequence functions
+

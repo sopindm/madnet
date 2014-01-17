@@ -4,7 +4,6 @@
            [java.nio.charset Charset]
            [madnet.sequence IBuffer ISequence ASequence CircularSequence]
            [madnet.util Pair]))
-
 ;;
 ;; ISequence and ASequence method wrappers
 ;;
@@ -19,10 +18,7 @@
   (.position a-seq))
 
 (defn capacity [^ISequence seq]
-  (.limit seq))
-
-(defn limit [n ^ISequence seq]
-  (.limit seq n))
+  (+ (size seq) (free-space seq)))
 
 (defn free-space [seq]
   (.freeSpace seq))

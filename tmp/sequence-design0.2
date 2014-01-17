@@ -1,0 +1,50 @@
+(defprotocol IRange [IClonable]
+  (begin [this]) ;integer or null (neg infinity)
+  (end [this]) ;integer or null (pos infinity)
+  (take [this n])
+  (drop [this n])
+  (take-last [this n])
+  (drop-last [this n])
+  (expand [this n]))
+
+(defprotocol IReadableChannel
+  (read [this writable]))
+
+(defprotocol IWritableChannel
+  (write [this readable]))
+
+(defclass ARange [^Integer begin ^Integer end]
+  (begin [this])
+  (end [this])
+  (take [this n])
+  (drop [this n])
+  (take-last [this n])
+  (drop-last [this n])
+  (expand [this n]))
+
+(defclass LinkedRange [ARange] [prev next])
+
+(defclass CircularRange [^Integer begin ^Integer end ^Integer size] ...)
+
+(defprotocol ISequenceReader [IReadableChannel] [range]
+   (range [this])
+   (read [this writer]))
+
+(defprotocol ISequenceWriter [IWritableChannel] [range]
+   (range [this])
+   (write [this reader]))             
+
+(defprotocol ISequence [IReadableChannel IWritableChannel Iterable ISeqable IClonable]
+  (^ISequenceReader reader [this])
+  (^ISequenceWriter writer [this])
+  (size [this] (size reader))
+  (free-space [this] (size writer))
+  (read [this writable])
+  (write [this readable])
+  (iterator [this]) ;over reader
+  (get [this index]) ;in reader
+  (seq [this])) ;seq reader
+
+(defclass ASequence [ISequence] [buffer position size writer-size])
+(defclass CircularSequence [ISequence] [seq])
+          

@@ -9,9 +9,6 @@ public abstract class ISequence
     abstract public int size();
     abstract public int freeSpace();
 
-    abstract public int limit();
-    abstract public ISequence limit(int newLimit);
-
     abstract public ISequence take(int n);
     abstract public ISequence drop(int n);
 

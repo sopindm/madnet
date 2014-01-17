@@ -1,7 +1,6 @@
 package madnet.sequence.nio;
 
 import madnet.sequence.IBuffer;
-import madnet.sequence.ISequence;
 import madnet.sequence.ASequence;
 
 public class ByteBuffer implements IBuffer
@@ -18,7 +17,7 @@ public class ByteBuffer implements IBuffer
         return this.size;
     }
 
-    public ISequence sequence(int offset, int size, int limit)
+    public ASequence sequence(int offset, int size, int limit)
     {
         return new ASequence(this, offset, size, limit);
     }

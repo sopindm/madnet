@@ -2,6 +2,6 @@ package madnet.sequence;
 
 public interface IBuffer
 {
-    ISequence sequence(int offset, int size, int limit);
+    ASequence sequence(int offset, int size, int limit);
     int size();
 }
