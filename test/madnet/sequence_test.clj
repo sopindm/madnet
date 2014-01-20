@@ -12,7 +12,7 @@
   (let [arg-sym 'n this-sym 'this]
     `(let [~min-arg (atom (int ~min-arg))
            ~max-arg (atom (int ~max-arg))]
-       (proxy [~@class-and-interfaces] [~@constructor-args]
+       (proxy [~@class-and-interfaces] [@~min-arg @~max-arg ~@constructor-args]
          (begin
            ([] @~min-arg)
            ([~arg-sym] (reset! ~min-arg ~arg-sym) ~this-sym))
@@ -22,7 +22,6 @@
          ~@methods))))
 
 (defn- irange [min max]
-  (when (> min max) (throw (IllegalArgumentException.)))
   (range-proxy [Range] [min max] 
     (clone [] (irange @min @max))))
 
@@ -93,11 +92,41 @@
     (s/take! 5 r)
     (?range= (.limit cr) [5 15])
     (s/take! 5 (.limit cr))
-    (?range= (.limit cr) [5 15])))
+    (?range= (.limit cr) [5 15])
+    (?throws (crange 5 10 (irange 6 10) IllegalArgumentException))
+    (?throws (crange 5 10 (irange 5 9) IllegalArgumentException))))
 
-;circular range's cloning
-;circualr range's equality and hash
-;circular range operations
+;exception creating circular range not in limit
+
+(deftest circular-range-cloning
+  (let [cr1 (crange 1 2 (irange 0 4))
+        l1 (.limit cr1)
+        cr2 (.clone cr1)]
+    (?range= cr2 [1 2])
+    (?range= (.limit cr2) [0 4])
+    (s/take! 1 (.limit cr1))
+    (?range= (.limit cr1) [0 4])
+    (?range= (.limit cr2) [0 4])))
+
+(deftest circular-range-equality-and-hash
+  (let [cr1 (crange 1 2 (irange 0 4))
+        cr2 (crange 1 2 (irange 0 4))
+        cr3 (crange 1 2 (.limit cr1))
+        cr4 (crange 1 2 (irange 0 5))]
+    (?= cr1 cr2)
+    (?= cr1 cr3)
+    (?false (= cr1 cr4))
+    (?= (hash cr1) (hash cr2))
+    (?= (hash cr1) (hash cr3))
+    (?false (= (hash cr1) (hash cr4)))))
+
+(deftest ciruclar-range-operations
+  (let [cr (crange 0 0 (irange -5 5))]
+    (?range= (s/expand! 7 cr) [0 -3])
+    (?range= (s/take 6 cr) [0 -4])
+    (?range= (s/drop 6 cr) [-4 -3])
+    (?range= (s/take-last 1 cr) [-4 -3])
+    (?range= (s/drop-last 2 cr) [0 -5])))
 
 (comment
   (defmacro ?sequence= [form [position size]]
