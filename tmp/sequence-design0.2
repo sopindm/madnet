@@ -34,17 +34,15 @@
    (range [this])
    (write [this reader]))             
 
-(defprotocol ISequence [IReadableChannel IWritableChannel Iterable ISeqable IClonable]
+(defprotocol ISequence [Iterable ISeqable IClonable]
   (^ISequenceReader reader [this])
   (^ISequenceWriter writer [this])
   (size [this] (size reader))
   (free-space [this] (size writer))
-  (read [this writable])
-  (write [this readable])
-  (iterator [this]) ;over reader
+          (iterator [this]) ;over reader
   (get [this index]) ;in reader
   (seq [this])) ;seq reader
 
-(defclass ASequence [ISequence] [buffer position size writer-size])
-(defclass CircularSequence [ISequence] [seq])
+(defclass ASequence [ISequence] [buffer ^IRange readAt ^IRange writeAt])
+
           
