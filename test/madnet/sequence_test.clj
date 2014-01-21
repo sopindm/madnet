@@ -8,22 +8,8 @@
      (?= (.begin range#) ~begin)
      (?= (.end range#) ~end)))
 
-(defmacro range-proxy [[& class-and-interfaces] [min-arg max-arg & constructor-args] & methods]
-  (let [arg-sym 'n this-sym 'this]
-    `(let [~min-arg (atom (int ~min-arg))
-           ~max-arg (atom (int ~max-arg))]
-       (proxy [~@class-and-interfaces] [@~min-arg @~max-arg ~@constructor-args]
-         (begin
-           ([] @~min-arg)
-           ([~arg-sym] (reset! ~min-arg ~arg-sym) ~this-sym))
-         (end 
-           ([] @~max-arg)
-           ([~arg-sym] (reset! ~max-arg ~arg-sym) ~this-sym))
-         ~@methods))))
-
 (defn- irange [min max]
-  (range-proxy [Range] [min max] 
-    (clone [] (irange @min @max))))
+  (Range. (int min) (int max)))
 
 (deftest making-range
   (?range= (irange 5 15) [5 15])
@@ -81,8 +67,7 @@
       (?range= r [5 10]))))
 
 (defn- crange [min max limit]
-  (range-proxy [CircularRange] [min max limit]
-    (clone [] (crange @min @max limit))))
+  (CircularRange. (int min) (int max) limit))
 
 (deftest making-circular-ranges
   (let [r (irange 5 15)
@@ -93,10 +78,9 @@
     (?range= (.limit cr) [5 15])
     (s/take! 5 (.limit cr))
     (?range= (.limit cr) [5 15])
-    (?throws (crange 5 10 (irange 6 10) IllegalArgumentException))
-    (?throws (crange 5 10 (irange 5 9) IllegalArgumentException))))
-
-;exception creating circular range not in limit
+    (?= (s/size cr) 6)
+    (?throws (crange 5 10 (irange 6 10)) IllegalArgumentException)
+    (?throws (crange 5 10 (irange 5 9)) IllegalArgumentException)))
 
 (deftest circular-range-cloning
   (let [cr1 (crange 1 2 (irange 0 4))
@@ -126,7 +110,11 @@
     (?range= (s/take 6 cr) [0 -4])
     (?range= (s/drop 6 cr) [-4 -3])
     (?range= (s/take-last 1 cr) [-4 -3])
-    (?range= (s/drop-last 2 cr) [0 -5])))
+    (?range= (s/drop-last 2 cr) [0 -5])
+    (?throws (s/take 100 cr) IndexOutOfBoundsException)
+    (?throws (s/take-last 100 cr) IndexOutOfBoundsException)
+    (?throws (s/drop 100 cr) IndexOutOfBoundsException)
+    (?throws (s/drop-last 100 cr) IndexOutOfBoundsException)))
 
 (comment
   (defmacro ?sequence= [form [position size]]

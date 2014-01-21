@@ -1,12 +1,34 @@
 package madnet.sequence;
 
-public abstract class Range implements IRange
+public class Range implements IRange
 {
-    abstract public int begin();
-    abstract public Range begin(int value);
+    private int begin;
+    private int end;
 
-    abstract public int end();
-    abstract public Range end(int value);
+    protected Range(int begin, int end, boolean checkBounds) {
+        this.begin = begin;
+        this.end = end;
+
+        if(checkBounds && begin > end)
+            throw new IllegalArgumentException();
+    }
+
+    public Range(int begin, int end) {
+        this(begin, end, true);
+    }
+
+    public int begin() { return begin; };
+    public int end() { return end; };
+
+    public Range begin(int value) {
+        this.begin = value;
+        return this;
+    }
+
+    public Range end(int value) {
+        this.end = value;
+        return this;
+    }
 
     public boolean equals(Object o) {
         if(!(o instanceof Range))
