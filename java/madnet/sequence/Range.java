@@ -93,4 +93,12 @@ public class Range implements IRange
 
         return taken;
     }
+
+    public IRange read(IRange range) throws Exception {
+        throw new UnsupportedOperationException();
+    }
+
+    public IRange write(IRange range) throws Exception {
+        throw new UnsupportedOperationException();
+    }
 }

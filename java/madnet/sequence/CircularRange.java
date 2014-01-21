@@ -1,5 +1,7 @@
 package madnet.sequence;
 
+import java.util.ArrayList;
+
 public class CircularRange extends Range
 {
     private Range limit;
@@ -83,5 +85,18 @@ public class CircularRange extends Range
         applyLimit();
 
         return this;
+    }
+
+    public Iterable<Range> ranges() {
+        ArrayList<Range> rangesList = new ArrayList<Range>();
+
+        if(begin() < end()) {
+            rangesList.add(new Range(begin(), end()));
+            return rangesList;
+        }
+            
+        rangesList.add(new Range(begin(), limit.end()));
+        rangesList.add(new Range(limit.begin(), end()));
+        return rangesList;
     }
 }

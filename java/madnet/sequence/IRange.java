@@ -15,4 +15,7 @@ public interface IRange extends Cloneable
     public IRange expand(int n) throws Exception;
 
     public IRange split(int n) throws Exception;
+
+    public IRange read(IRange range) throws Exception;
+    public IRange write(IRange range) throws Exception;
 }

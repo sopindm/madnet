@@ -50,6 +50,16 @@
   (let [clone (.clone range)]
     [(split! n clone) clone]))
 
+;;
+;; Reading/writing
+;;
+
+(defn write [dest src]
+  (.write dest src))
+
+(defn read [dest src]
+  (.read dest src))
+
 (comment
   ;;
   ;; ISequence and ASequence method wrappers
@@ -114,9 +124,9 @@
     (let [expanded (expand n seq)]
       [(take-last n expanded) expanded]))
 
-  ;;
-  ;; Reading/writing
-  ;;
+;;
+;; Reading/writing
+;;
 
   (defn write [dest src]
     (let [pair (.write dest src)]
