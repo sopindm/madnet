@@ -1,10 +1,13 @@
 (ns madnet.sequence
-  (:refer-clojure :exclude [take drop sequence take-last drop-last read range])
-  (:import [madnet.sequence Range]))
+  (:refer-clojure :exclude [take drop sequence take-last drop-last read range proxy])
+  (:import [madnet.sequence Range ProxyRange]))
 
 ;;
 ;; Range operation wrappers
 ;;
+
+(defn proxy [range]
+  (ProxyRange. range))
 
 (defn size [range]
   (.size range))
@@ -24,8 +27,11 @@
 (defn expand! [n range]
   (.expand range n))
 
+(declare take)
 (defn split! [n range]
-  (.split range n))
+  (let [split (take n range)]
+    (drop! n range)
+    split))
 
 ;;
 ;; Immutable range operations
@@ -124,7 +130,7 @@
     (let [expanded (expand n seq)]
       [(take-last n expanded) expanded]))
 
-;;
+p;;
 ;; Reading/writing
 ;;
 

@@ -87,13 +87,6 @@ public class Range implements IRange
         return end(end() + n);
     }
 
-    public Range split(int n) throws Exception {
-        Range taken = clone().take(n);
-        drop(n);
-
-        return taken;
-    }
-
     public IRange read(IRange range) throws Exception {
         throw new UnsupportedOperationException();
     }

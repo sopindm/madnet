@@ -126,19 +126,53 @@
     (?= (seq (.ranges cr1)) [(irange 0 10)])
     (?= (seq (.ranges cr2)) [(irange 8 10) (irange 0 3)])))
 
-;range proxy
-;;range proxy is a range(equality, hash code)
-;;range proxy cloning (returns proxy to cloned range)
-;;overriding proxy methods (check any)
-;;read-only and write-only proxies
+(deftest range-proxy-making
+  (let [r (irange 0 10)
+        p (r/proxy r)]
+    (?= (r/size p) 10)
+    (?range= (.range p) [0 10])))
+    
+(deftest range-proxy-equality-and-hash-code
+  (let [r1 (irange 0 10)
+        r2 (irange 0 10)
+        r3 (irange 1 10)]
+    (?= (r/proxy r1) (r/proxy r2))
+    (?false (= r1 r3))
+    (?= (hash (r/proxy r1)) (hash (r/proxy r2)))
+    (?false (= (hash r1) (hash r3)))))
 
-;linked range
-;separate range namespace
+(deftest range-proxy-cloning
+  (let [r (irange 0 10)
+        pr (r/proxy r)
+        prc (.clone pr)]
+    (?range= (.range prc) [0 10])
+    (r/drop! 5 r)
+    (?range= (.range prc) [0 10])))
+
+(deftest range-proxy-operations
+  (let [pr (r/proxy (irange 0 10))]
+    (?= (r/size (r/drop! 3 pr)) 7)
+    (?range= (.range pr) [3 10])
+    (?= (r/size (r/take! 5 pr)) 5)
+    (?range= (.range pr) [3 8])
+    (?= (r/size (r/expand! 3 pr)) 8)
+    (?range= (.range pr) [3 11])
+    (?= (r/size (r/take-last! 4 pr)) 4)
+    (?range= (.range pr) [7 11])
+    (?= (r/size (r/drop-last! 1 pr)) 3)
+    (?range= (.range pr) [7 10])))
+
+;proxy read-write (extend some range and check)
+;read-only and write-only proxies
+;extending proxy
 
 ;simple seq based range
 ;range read/write (mutable and immutable)
 
 ;writing to circular range range's
+
+;linked range
+;separate range namespace
 
 ;concrete range's (nio and arrays) - separate namespaces
 
