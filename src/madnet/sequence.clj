@@ -6,8 +6,17 @@
 ;; Range operation wrappers
 ;;
 
-(defn proxy [range]
-  (ProxyRange. range))
+(defn- proxy-method- [option]
+  (case option
+    :read-only '(write [_] (throw (UnsupportedOperationException.)))
+    :write-only '(read [_] (throw (UnsupportedOperationException.)))
+    option))
+
+(defmacro proxy [range & options-and-methods]
+  (if (empty? options-and-methods)
+    `(ProxyRange. ~range)
+    `(clojure.core/proxy [ProxyRange] [~range]
+       ~@(map proxy-method- options-and-methods))))
 
 (defn size [range]
   (.size range))

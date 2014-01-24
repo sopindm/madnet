@@ -162,9 +162,27 @@
     (?= (r/size (r/drop-last! 1 pr)) 3)
     (?range= (.range pr) [7 10])))
 
-;proxy read-write (extend some range and check)
-;read-only and write-only proxies
-;extending proxy
+(deftest range-proxy-read-and-write
+  (let [r (proxy [Range] [0 10]
+            (write [seq] (throw (UnsupportedOperationException. "Writing to proxies is OK")))
+            (read [seq] (throw (UnsupportedOperationException. "Reading from proxies is OK"))))
+        pr (r/proxy r)]
+    (?throws (r/write pr nil) UnsupportedOperationException "Writing to proxies is OK")
+    (?throws (r/read pr nil) UnsupportedOperationException "Reading from proxies is OK")))
+
+(deftest read-only-and-write-only-proxies
+  (let [r (proxy [Range] [0 10] (write [seq] nil) (read [seq] nil))
+        rp (r/proxy r :read-only)
+        wp (r/proxy r :write-only)]
+    (?= (r/read rp nil) rp)
+    (?throws (r/read wp nil) UnsupportedOperationException)
+    (?= (r/write wp nil) wp)
+    (?throws (r/write rp nil) UnsupportedOperationException)))
+
+(deftest extending-range-proxy
+  (let [r (irange 0 10)
+        p (r/proxy r (expand [n] this))]
+    (?= (r/expand 1000 p) p)))
 
 ;simple seq based range
 ;range read/write (mutable and immutable)
