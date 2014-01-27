@@ -88,10 +88,10 @@ public class Range implements IRange
     }
 
     public IRange read(IRange range) throws Exception {
-        throw new UnsupportedOperationException();
+        return null;
     }
 
     public IRange write(IRange range) throws Exception {
-        throw new UnsupportedOperationException();
+        return null;
     }
 }

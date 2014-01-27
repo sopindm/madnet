@@ -22,8 +22,8 @@
   (?= (hash (irange 5 10)) (hash (irange 5 10))))
 
 (deftest range-read-and-write
-  (?throws (r/read (irange 0 1) (irange 5 10)) UnsupportedOperationException)
-  (?throws (r/write (irange 2 10) (irange 5 10)) UnsupportedOperationException))
+  (?throws (r/read! (irange 0 1) (irange 5 10)) UnsupportedOperationException)
+  (?throws (r/write! (irange 2 10) (irange 5 10)) UnsupportedOperationException))
 
 (deftest range-mutable-take-drop-and-expand
   (let [r (irange 5 10)]
@@ -167,25 +167,90 @@
             (write [seq] (throw (UnsupportedOperationException. "Writing to proxies is OK")))
             (read [seq] (throw (UnsupportedOperationException. "Reading from proxies is OK"))))
         pr (r/proxy r)]
-    (?throws (r/write pr nil) UnsupportedOperationException "Writing to proxies is OK")
-    (?throws (r/read pr nil) UnsupportedOperationException "Reading from proxies is OK")))
+    (?throws (r/write! pr nil) UnsupportedOperationException "Writing to proxies is OK")
+    (?throws (r/read! pr nil) UnsupportedOperationException "Reading from proxies is OK")))
 
 (deftest read-only-and-write-only-proxies
   (let [r (proxy [Range] [0 10] (write [seq] nil) (read [seq] nil))
         rp (r/proxy r :read-only)
         wp (r/proxy r :write-only)]
-    (?= (r/read rp nil) rp)
-    (?throws (r/read wp nil) UnsupportedOperationException)
-    (?= (r/write wp nil) wp)
-    (?throws (r/write rp nil) UnsupportedOperationException)))
+    (?= (r/read! rp nil) rp)
+    (?throws (r/read! wp nil) UnsupportedOperationException)
+    (?= (r/write! wp nil) wp)
+    (?throws (r/write! rp nil) UnsupportedOperationException)))
 
 (deftest extending-range-proxy
   (let [r (irange 0 10)
         p (r/proxy r (expand [n] this))]
     (?= (r/expand 1000 p) p)))
 
-;simple seq based range
-;range read/write (mutable and immutable)
+(defn- srange [begin end coll]
+  (let [coll (atom coll)]
+    (proxy [CircularRange clojure.lang.Seqable clojure.lang.Counted]
+        [begin end (irange 0 (count @coll))]
+      (seq [] (seq (->> @coll (take (.end this)) (drop (.begin this)))))
+      (count [] (r/size this))
+      (write [ts] 
+        (if (isa? (type ts) clojure.lang.Seqable)
+          (let [write-size (min (count this) (count ts))]
+            (reset! coll (concat (take begin @coll)
+                                 (take write-size (seq ts))
+                                 (drop (+ begin write-size) @coll)))
+            (r/drop! write-size this)
+            (r/drop! write-size ts)
+            this)))
+      (read [ts] nil))))
+
+(defn- another-range [begin end coll]
+  (let [sr (srange begin end coll)]
+    (r/proxy sr
+      (write [ts] nil)
+      (read [ts] (r/write! sr ts) this))))
+
+(deftest simple-seq-based-range
+  (let [r (srange 2 5 (range 10))]
+    (?range= r [2 5])
+    (?= (seq r) [2 3 4])
+    (let [r2 (srange 0 4 (repeat 10 nil))
+          cr2 (.clone r2)]
+      (?range= (r/read! r r2) [5 5])
+      (?range= r2 [3 4])
+      (?= (seq r2) [nil])
+      (?= (seq cr2) [2 3 4 nil]))))
+
+(deftest writing-without-write-impl
+  (let [r1 (another-range 1 6 (repeat 6 nil))
+        rc (.clone r1)
+        r2 (another-range 0 5 [1 2 3 4 5])]
+    (?= (r/write! r1 r2) r1)
+    (?= (seq (.range rc)) [1 2 3 4 5])))
+
+(deftest reading-and-writing-to-unknown-type
+  (let [r1 (srange 0 10 (repeat 10 nil))
+        r2 (irange 0 10)]
+    (?throws (r/write! r2 r1) UnsupportedOperationException)
+    (?throws (r/write! r1 r2) UnsupportedOperationException)
+    (?throws (r/read! r1 r2) UnsupportedOperationException)
+    (?throws (r/read! r2 r1) UnsupportedOperationException)))
+
+(deftest immutable-write-and-read
+  (let [r1 (srange 0 5 (repeat 5 nil))
+        r2 (srange 0 3 [1 2 3])]
+    (let [[writen read] (r/write r1 r2)]
+      (?range= writen [3 5])
+      (?range= read [3 3]))
+    (?= (seq r1) [1 2 3 nil nil])
+    (?= (seq r2) [1 2 3])
+    (let [[read writen] (r/read (r/drop! 2 r1) r2)]
+      (?range= read [5 5])
+      (?range= writen [3 3])
+      (?= (seq r1) [3 nil nil])
+      (?= (seq r2) [3 nil nil]))))
+
+;immutable read
+
+;rename range to linear range
+;base range class
 
 ;writing to circular range range's
 

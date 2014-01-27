@@ -69,11 +69,25 @@
 ;; Reading/writing
 ;;
 
+(defn write! [dest src]
+  (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.)))
+  dest)
+
+(defn read! [dest src]
+  (or (.read dest src) (.write src dest) (throw (UnsupportedOperationException.)))
+  dest)
+
 (defn write [dest src]
-  (.write dest src))
+  (let [writen (.clone dest)
+        read (.clone src)]
+    (write! writen read)
+    [writen read]))
 
 (defn read [dest src]
-  (.read dest src))
+  (let [read (.clone dest)
+        writen (.clone src)]
+    (read! read writen)
+    [read writen]))
 
 (comment
   ;;
@@ -139,7 +153,7 @@
     (let [expanded (expand n seq)]
       [(take-last n expanded) expanded]))
 
-p;;
+;;
 ;; Reading/writing
 ;;
 
