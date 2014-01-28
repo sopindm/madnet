@@ -306,8 +306,15 @@
     (?= (hash lr) (hash (link! (.clone r1) r2 r3)))
     (?false (= (hash lr) (hash (link! (.clone r1) (.clone r2) r3))))))
 
-;linked ranges operations
-;;take, drop, takeLast, dropLast, expand
+(deftest linked-range-operations
+  (let [r1 (irange 0 10)
+        r2 (irange 10 20)
+        r3 (irange -10 0)
+        lr (link! r1 r3 r2)]
+    (r/drop! 3 lr)
+    (?range= r3 [-10 3])
+    (r/expand! 7 lr)
+    (?range= r2 [17 20])))
 
 ;separate range namespace
 

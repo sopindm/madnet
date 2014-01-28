@@ -38,4 +38,20 @@ public class LinkedRange extends ProxyRange
 
         return hash;
     }
+
+    public LinkedRange drop(int n) throws Exception {
+        super.drop(n);
+        if(prev != null)
+            prev.expand(n);
+
+        return this;
+    }
+
+    public LinkedRange expand(int n) throws Exception {
+        super.expand(n);
+        if(next != null)
+            next.drop(n);
+
+        return this;
+    }
 }
