@@ -1,4 +1,4 @@
-package madnet.sequence;
+package madnet.range;
 
 public class Range implements IRange
 {
