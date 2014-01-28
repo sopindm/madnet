@@ -1,7 +1,7 @@
 (ns madnet.sequence-test
   (:require [khazad-dum.core :refer :all]
             [madnet.sequence :as r])
-  (:import [madnet.sequence Range CircularRange ProxyRange]))
+  (:import [madnet.sequence Range CircularRange ProxyRange LinkedRange]))
 
 (defmacro ?range= [expr [begin end]]
   `(let [range# ~expr]
@@ -267,7 +267,48 @@
       (?range= (.range (r/read! r2 r11)) [4 1])
       (?= (seq (.range r1)) [3 4 nil]))))
 
-;linked range
+(defn- link! [range prev next]
+  (LinkedRange. range prev next))
+
+(deftest make-linked-range
+  (let [r1 (irange 0 10)
+        r2 (irange 10 15)
+        r3 (irange -7 0)
+        l1 (link! r1 r3 r2)
+        l2 (link! r2 r1 nil)
+        l3 (link! r3 nil r1)]
+    (?= (r/size l1) 10)
+    (?= (r/size l2) 5)
+    (?= (r/size l3) 7)
+    (?true (isa? (type l1) ProxyRange))))
+
+(deftest linked-range-cloning
+  (let [r1 (irange 0 10)
+        r2 (irange 10 15)
+        r3 (irange 10 15)
+        lr (link! r1 r3 r2)
+        lc (.clone lr)]
+    (r/drop! 5 r1)
+    (?range= (.range lc) [0 10])
+    (r/drop! 5 r2)
+    (?range= (.next lc) [15 15])
+    (r/drop! 3 r3)
+    (?range= (.prev lc) [13 15])))
+
+(deftest linked-range-equality
+  (let [r1 (irange 0 10)
+        r2 (irange 10 15)
+        r3 (irange -8 0)
+        lr (link! r1 r2 r3)]
+    (?= lr (link! (.clone r1) r2 r3))
+    (?false (= lr (link! (.clone r1) (.clone r2) r3)))
+    (?false (= lr (link! (.clone r1) r2 (.clone r3))))
+    (?= (hash lr) (hash (link! (.clone r1) r2 r3)))
+    (?false (= (hash lr) (hash (link! (.clone r1) (.clone r2) r3))))))
+
+;linked ranges operations
+;;take, drop, takeLast, dropLast, expand
+
 ;separate range namespace
 
 ;concrete range's (nio and arrays) - separate namespaces
