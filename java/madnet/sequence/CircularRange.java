@@ -87,16 +87,16 @@ public class CircularRange extends Range
         return this;
     }
 
-    public Iterable<Range> ranges() {
+    public Iterable<Range> ranges() throws Exception {
         ArrayList<Range> rangesList = new ArrayList<Range>();
 
-        if(begin() < end()) {
-            rangesList.add(new Range(begin(), end()));
+        if(begin() <= end()) {
+            rangesList.add(clone());
             return rangesList;
         }
             
-        rangesList.add(new Range(begin(), limit.end()));
-        rangesList.add(new Range(limit.begin(), end()));
+        rangesList.add(clone().take(limit.end() - begin()));
+        rangesList.add(clone().takeLast(end() - limit.begin()));
         return rangesList;
     }
 }

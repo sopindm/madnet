@@ -1,7 +1,7 @@
 (ns madnet.sequence-test
   (:require [khazad-dum.core :refer :all]
             [madnet.sequence :as r])
-  (:import [madnet.sequence Range CircularRange]))
+  (:import [madnet.sequence Range CircularRange ProxyRange]))
 
 (defmacro ?range= [expr [begin end]]
   `(let [range# ~expr]
@@ -123,8 +123,9 @@
 (deftest circular-range-ranges
   (let [cr1 (crange 0 10 (irange -5 15))
         cr2 (crange 8 3 (irange 0 10))]
-    (?= (seq (.ranges cr1)) [(irange 0 10)])
-    (?= (seq (.ranges cr2)) [(irange 8 10) (irange 0 3)])))
+    (?= (seq (.ranges cr1)) [(crange 0 10 (irange -5 15))])
+    (?= (seq (.ranges cr2)) [(crange 8 10 (irange 0 10))
+                             (crange 0 3 (irange 0 10))])))
 
 (deftest range-proxy-making
   (let [r (irange 0 10)
@@ -188,24 +189,29 @@
   (let [coll (atom coll)]
     (proxy [CircularRange clojure.lang.Seqable clojure.lang.Counted]
         [begin end (irange 0 (count @coll))]
-      (seq [] (seq (->> @coll (take (.end this)) (drop (.begin this)))))
+      (seq [] (seq (mapcat #(->> @coll (take (.end %)) (drop (.begin %))) (.ranges this))))
       (count [] (r/size this))
       (write [ts] 
         (if (isa? (type ts) clojure.lang.Seqable)
-          (let [write-size (min (count this) (count ts))]
-            (reset! coll (concat (take begin @coll)
-                                 (take write-size (seq ts))
-                                 (drop (+ begin write-size) @coll)))
-            (r/drop! write-size this)
-            (r/drop! write-size ts)
-            this)))
+          (letfn [(write- [dst src]
+                    (let [write-size (min (count dst) (count src))]
+                      (reset! coll (concat (take (.begin dst) @coll)
+                                           (take write-size (seq src))
+                                           (drop (+ (.begin dst) write-size) @coll)))
+                      (r/drop! write-size dst)
+                      (r/drop! write-size src)
+                      write-size))]
+            (let [write-size (reduce (fn [size r] (+ size (write- r ts))) 0 (.ranges this))]
+              (r/drop! write-size this)))))
       (read [ts] nil))))
 
 (defn- another-range [begin end coll]
   (let [sr (srange begin end coll)]
     (r/proxy sr
       (write [ts] nil)
-      (read [ts] (r/write! sr ts) this))))
+      (read [ts] (if (isa? (type ts) ProxyRange)
+                   (do (r/read! sr (.range ts)) this)
+                   (do (r/read! sr ts) this))))))
 
 (deftest simple-seq-based-range
   (let [r (srange 2 5 (range 10))]
@@ -247,12 +253,19 @@
       (?= (seq r1) [3 nil nil])
       (?= (seq r2) [3 nil nil]))))
 
-;immutable read
-
-;rename range to linear range
-;base range class
-
-;writing to circular range range's
+(deftest reading-and-writing-from-circular-range-ranges
+  (let [r1 (srange 3 1 (repeat 5 nil))
+        r2 (srange 2 1 [1 2 3 4])]
+    (let [[r11 r12] (.ranges r1)]
+      (?range= r11 [3 5])
+      (?range= r12 [0 1])
+      (?range= (r/write! r11 r2) [5 5])
+      (?= (seq r1) [3 4 nil])))
+  (let [r1 (another-range 3 1 (repeat 5 nil))
+        r2 (another-range 2 1 [1 2 3 4])]
+    (let [[r11 r12] (.ranges (.range r1))]
+      (?range= (.range (r/read! r2 r11)) [4 1])
+      (?= (seq (.range r1)) [3 4 nil]))))
 
 ;linked range
 ;separate range namespace
