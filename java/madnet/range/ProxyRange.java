@@ -8,17 +8,6 @@ public class ProxyRange implements IRange
         this.range = range;
     }
 
-    public boolean equals(Object o) {
-        if(!(o instanceof ProxyRange))
-            return false;
-
-        return ((ProxyRange)o).range.equals(range);
-    }
-
-    public int hashCode() {
-        return 13891 + range.hashCode() * 31;
-    }
-
     public ProxyRange clone() throws CloneNotSupportedException {
         ProxyRange pr=(ProxyRange)super.clone();
         pr.range = pr.range.clone();

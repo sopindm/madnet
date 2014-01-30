@@ -39,19 +39,6 @@ public class CircularRange extends Range
         return range;
     }
 
-    public boolean equals(Object o) {
-        if(!(o instanceof CircularRange))
-            return false;
-
-        CircularRange cr = (CircularRange)o;
-
-        return super.equals(cr) && limit.equals(cr.limit);
-    }
-
-    public int hashCode() {
-        return super.hashCode() * 31 + limit.hashCode();
-    }
-
     public CircularRange take(int n) throws Exception {
         super.take(n);
         applyLimit();

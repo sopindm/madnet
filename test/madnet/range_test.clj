@@ -17,10 +17,6 @@
   (?throws (irange 6 5) IllegalArgumentException)
   (?= (r/size (irange 5 10)) 5))
 
-(deftest range-equality
-  (?= (irange 5 10) (irange 5 10))
-  (?= (hash (irange 5 10)) (hash (irange 5 10))))
-
 (deftest range-read-and-write
   (?throws (r/read! (irange 0 1) (irange 5 10)) UnsupportedOperationException)
   (?throws (r/write! (irange 2 10) (irange 5 10)) UnsupportedOperationException))
@@ -77,7 +73,7 @@
   (let [r (irange 5 15)
         cr (crange 10 6 r)]
     (?range= cr [10 6])
-    (?= (.limit cr) r)
+    (?range= (.limit cr) [5 15])
     (r/take! 5 r)
     (?range= (.limit cr) [5 15])
     (r/take! 5 (.limit cr))
@@ -96,18 +92,6 @@
     (?range= (.limit cr1) [0 4])
     (?range= (.limit cr2) [0 4])))
 
-(deftest circular-range-equality-and-hash
-  (let [cr1 (crange 1 2 (irange 0 4))
-        cr2 (crange 1 2 (irange 0 4))
-        cr3 (crange 1 2 (.limit cr1))
-        cr4 (crange 1 2 (irange 0 5))]
-    (?= cr1 cr2)
-    (?= cr1 cr3)
-    (?false (= cr1 cr4))
-    (?= (hash cr1) (hash cr2))
-    (?= (hash cr1) (hash cr3))
-    (?false (= (hash cr1) (hash cr4)))))
-
 (deftest circular-range-operations
   (let [cr (crange 0 0 (irange -5 5))]
     (?range= (r/expand! 7 cr) [0 -3])
@@ -123,9 +107,14 @@
 (deftest circular-range-ranges
   (let [cr1 (crange 0 10 (irange -5 15))
         cr2 (crange 8 3 (irange 0 10))]
-    (?= (seq (.ranges cr1)) [(crange 0 10 (irange -5 15))])
-    (?= (seq (.ranges cr2)) [(crange 8 10 (irange 0 10))
-                             (crange 0 3 (irange 0 10))])))
+    (?= (count (.ranges cr1)) 1)
+    (?range= (first (.ranges cr1)) [0 10])
+    (?range= (-> cr1 .ranges first .limit) [-5 15])
+    (?= (count (.ranges cr2)) 2)
+    (?range= (-> cr2 .ranges first) [8 10])
+    (?range= (-> cr2 .ranges first .limit) [0 10])
+    (?range= (-> cr2 .ranges second) [0 3])
+    (?range= (-> cr2 .ranges second .limit) [0 10])))
 
 (deftest range-proxy-making
   (let [r (irange 0 10)
@@ -133,15 +122,6 @@
     (?= (r/size p) 10)
     (?range= (.range p) [0 10])))
     
-(deftest range-proxy-equality-and-hash-code
-  (let [r1 (irange 0 10)
-        r2 (irange 0 10)
-        r3 (irange 1 10)]
-    (?= (r/proxy r1) (r/proxy r2))
-    (?false (= r1 r3))
-    (?= (hash (r/proxy r1)) (hash (r/proxy r2)))
-    (?false (= (hash r1) (hash r3)))))
-
 (deftest range-proxy-cloning
   (let [r (irange 0 10)
         pr (r/proxy r)
@@ -183,7 +163,7 @@
 (deftest extending-range-proxy
   (let [r (irange 0 10)
         p (r/proxy r (expand [n] this))]
-    (?= (r/expand 1000 p) p)))
+    (?range= (.range (r/expand 1000 p)) [0 10])))
 
 (defn- srange [begin end coll]
   (let [coll (atom coll)]
@@ -294,17 +274,6 @@
     (?range= (.next lc) [15 15])
     (r/drop! 3 r3)
     (?range= (.prev lc) [13 15])))
-
-(deftest linked-range-equality
-  (let [r1 (irange 0 10)
-        r2 (irange 10 15)
-        r3 (irange -8 0)
-        lr (link! r1 r2 r3)]
-    (?= lr (link! (.clone r1) r2 r3))
-    (?false (= lr (link! (.clone r1) (.clone r2) r3)))
-    (?false (= lr (link! (.clone r1) r2 (.clone r3))))
-    (?= (hash lr) (hash (link! (.clone r1) r2 r3)))
-    (?false (= (hash lr) (hash (link! (.clone r1) (.clone r2) r3))))))
 
 (deftest linked-range-operations
   (let [r1 (irange 0 10)

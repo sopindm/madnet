@@ -30,23 +30,6 @@ public class Range implements IRange
         return this;
     }
 
-    public boolean equals(Object o) {
-        if(!(o instanceof Range))
-            return false;
-
-        Range r = (Range)o;
-        return r.begin() == begin() && r.end() == end();
-    }
-
-    public int hashCode() {
-        int hash = 153;
-
-        hash = hash * 31 + begin();
-        hash = hash * 31 + end();
-
-        return hash;
-    } 
-
     public Range clone() throws CloneNotSupportedException {
         return (Range)super.clone();
     }
