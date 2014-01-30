@@ -11,6 +11,20 @@ public class Range extends madnet.range.Range {
         this.buffer = buffer.position(begin).limit(end);
     }
 
+    public Range begin(int n) {
+        super.begin(n);
+        buffer.position(n);
+
+        return this;
+    }
+
+    public Range end(int n) {
+        super.end(n);
+        buffer.limit(n);
+        
+        return this;
+    }
+
     public Buffer buffer() {
         return buffer;
     }
