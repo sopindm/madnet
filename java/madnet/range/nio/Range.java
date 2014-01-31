@@ -28,15 +28,4 @@ public class Range extends madnet.range.Range {
     public Buffer buffer() {
         return buffer;
     }
-
-    public boolean equals(Object o) {
-        if(!(o instanceof Range))
-            return false;
-
-        return super.equals(o) && buffer == ((Range)o).buffer;
-    }
-
-    public int hashCode() {
-        return super.hashCode() * 31 + buffer.hashCode();
-    }
 }

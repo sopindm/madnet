@@ -285,4 +285,3 @@
     (r/expand! 7 lr)
     (?range= r2 [17 20])))
 
-;concrete range's (nio and arrays) - separate namespaces
