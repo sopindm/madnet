@@ -1,5 +1,6 @@
 package madnet.range.nio;
 
+import madnet.range.IRange;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -36,5 +37,24 @@ public class ByteRange extends Range implements Iterable<Byte> {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    public ByteRange write(IRange range) throws Exception {
+        if(!(range instanceof ByteRange))
+            return null;
+
+        ByteRange br = (ByteRange)range;
+
+        if(br.size() > size()) {
+            buffer().put((ByteBuffer)br.buffer().duplicate().limit(br.begin() + size()));
+            br.drop(size());
+        }
+        else
+            buffer().put(br.buffer());
+
+        syncToBuffer();
+        br.syncToBuffer();
+
+        return this;
     }
 }

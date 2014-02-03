@@ -71,7 +71,44 @@
     (.put b 0 (byte 123))
     (?= (.get cr 0) (byte 123))))
 
-;;reading/writing
+(deftest byte-range-writing-and-reading
+  (letfn [(fill-buffer [n] 
+            (let [b (ByteBuffer/allocate n)]
+              (dotimes [i n] (.put b i (+ 1 (* i i))))
+              b))
+          (operation-check [f]
+            (let [b (fill-buffer 10)
+                  r1 (byte-range 0 10 b)
+                  r2 (byte-range 0 10 (ByteBuffer/allocate 10))
+                  rc (.clone r2)]
+              (f r2 r1)
+              (?range= r1 [10 10])
+              (?range= r2 [10 10])
+              (?= (seq rc) [1 2 5 10 17 26 37 50 65 82])))]
+    (operation-check r/write!)
+    (operation-check #(r/read! %2 %1))))
+
+(deftest writing-more-and-less-to-byte-buffer
+  (let [b (ByteBuffer/allocate 10)
+        source (byte-range 0 10 b)
+        dest (byte-range 0 5 (ByteBuffer/allocate 10))
+        dest-clone (.clone dest)]
+    (dotimes [i 10]
+      (.put b i (+ i 3)))
+    (r/write! dest source)
+    (?range= source [5 10])
+    (?range= dest [5 5])
+    (?= (seq dest-clone) [3 4 5 6 7]))
+  (let [b (ByteBuffer/allocate 10)
+        source (byte-range 0 5 b)
+        dest (byte-range 0 10 (ByteBuffer/allocate 10))
+        dest-clone (.clone dest)]
+    (dotimes [i 5]
+      (.put b i (+ i 2)))
+    (r/write! dest source)
+    (?range= source [5 5])
+    (?range= dest [5 10])
+    (?= (seq (r/take 5 dest-clone)) [2 3 4 5 6])))
 
 ; circular nio range
 ;;making
