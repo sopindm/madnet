@@ -25,12 +25,6 @@
     (?range= r [128 512])
     (?buffer= (.buffer r) 128 512 1024)))
 
-(deftest cloning-nio-range
-  (let [b (ByteBuffer/allocate 1024)
-        r (nrange 64 256 b)]
-    (?range= (.clone r) [64 256])
-    (?true (identical? (.buffer r) (.buffer (.clone r))))))
-
 (deftest nio-range-operations
   (let [r (nrange 15 32 (ByteBuffer/allocate 100))]
     (r/expand! 10 r)
@@ -38,7 +32,9 @@
     (r/drop! 12 r)
     (?buffer= (.buffer r) 27 42 100)
     (?throws (r/expand! 59 r) IllegalArgumentException)
-    (?throws (r/drop! 16 r) IllegalArgumentException)))
+    (?throws (r/drop! 16 r) IndexOutOfBoundsException)))
+
+;nio range circular operations
 
 ;;
 ;; byte range
@@ -68,8 +64,11 @@
   (let [b (ByteBuffer/allocate 100)
         r (byte-range 0 10 b)
         cr (.clone r)]
+    (?range= cr [0 10])
     (.put b 0 (byte 123))
-    (?= (.get cr 0) (byte 123))))
+    (?= (.get cr 0) (byte 123))
+    (r/drop! 5 r)
+    (?range= cr [0 10])))
 
 (deftest byte-range-writing-and-reading
   (letfn [(fill-buffer [n] 
@@ -110,8 +109,11 @@
     (?range= dest [5 10])
     (?= (seq (r/take 5 dest-clone)) [2 3 4 5 6])))
 
+;circular writing to byte buffer
+
 ; circular nio range
 ;;making
+;;operations
 ;;ranges
 ;;read/write
 
@@ -119,6 +121,8 @@
 ;;random access
 ;;iterable
 ;;converting to/from bytes
+;;;conversion methods
+;;;convertors range
 
 ;ranges for byte[] and char[]
 

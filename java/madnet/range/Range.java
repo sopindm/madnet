@@ -1,40 +1,20 @@
 package madnet.range;
 
-public class Range implements IRange
+abstract public class Range implements IRange
 {
-    private int begin;
-    private int end;
-
-    protected Range(int begin, int end, boolean checkBounds) {
-        this.begin = begin;
-        this.end = end;
-
-        if(checkBounds && begin > end)
-            throw new IllegalArgumentException();
-    }
-
     public Range(int begin, int end) {
-        this(begin, end, true);
-    }
-
-    public int begin() { return begin; };
-    public int end() { return end; };
-
-    public Range begin(int value) {
-        this.begin = value;
-        return this;
-    }
-
-    public Range end(int value) {
-        this.end = value;
-        return this;
+        if(begin > end)
+            throw new IllegalArgumentException();
     }
 
     public Range clone() throws CloneNotSupportedException {
         return (Range)super.clone();
     }
 
-    public Integer size() {
+    abstract protected Range begin(int n);
+    abstract protected Range end(int n);
+
+    public int size() {
         return end() - begin();
     }
 

@@ -1,7 +1,7 @@
 (ns madnet.range-test
   (:require [khazad-dum.core :refer :all]
             [madnet.range :as r])
-  (:import [madnet.range Range CircularRange ProxyRange LinkedRange]))
+  (:import [madnet.range Range IntegerRange CircularRange ProxyRange LinkedRange]))
 
 (defmacro ?range= [expr [begin end]]
   `(let [range# ~expr]
@@ -9,7 +9,7 @@
      (?= (.end range#) ~end)))
 
 (defn- irange [min max]
-  (Range. (int min) (int max)))
+  (IntegerRange. min max))
 
 (deftest making-range
   (?range= (irange 5 15) [5 15])
@@ -67,16 +67,13 @@
       (?range= r [5 10]))))
 
 (defn- crange [min max limit]
-  (CircularRange. (int min) (int max) limit))
+  (CircularRange. (irange min max) limit))
 
 (deftest making-circular-ranges
   (let [r (irange 5 15)
-        cr (crange 10 6 r)]
+        cr (crange 10 15 r)]
+    (r/expand! 1 cr)
     (?range= cr [10 6])
-    (?range= (.limit cr) [5 15])
-    (r/take! 5 r)
-    (?range= (.limit cr) [5 15])
-    (r/take! 5 (.limit cr))
     (?range= (.limit cr) [5 15])
     (?= (r/size cr) 6)
     (?throws (crange 5 10 (irange 6 10)) IllegalArgumentException)
@@ -84,17 +81,18 @@
 
 (deftest circular-range-cloning
   (let [cr1 (crange 1 2 (irange 0 4))
-        l1 (.limit cr1)
         cr2 (.clone cr1)]
     (?range= cr2 [1 2])
     (?range= (.limit cr2) [0 4])
+    (r/take! 1 cr1)
+    (?range= cr2 [1 2])
     (r/take! 1 (.limit cr1))
-    (?range= (.limit cr1) [0 4])
     (?range= (.limit cr2) [0 4])))
 
 (deftest circular-range-operations
   (let [cr (crange 0 0 (irange -5 5))]
     (?range= (r/expand! 7 cr) [0 -3])
+    (comment
     (?range= (r/take 6 cr) [0 -4])
     (?range= (r/drop 6 cr) [-4 -3])
     (?range= (r/take-last 1 cr) [-4 -3])
@@ -102,19 +100,18 @@
     (?throws (r/take 100 cr) IndexOutOfBoundsException)
     (?throws (r/take-last 100 cr) IndexOutOfBoundsException)
     (?throws (r/drop 100 cr) IndexOutOfBoundsException)
-    (?throws (r/drop-last 100 cr) IndexOutOfBoundsException)))
+    (?throws (r/drop-last 100 cr) IndexOutOfBoundsException))))
 
-(deftest circular-range-ranges
-  (let [cr1 (crange 0 10 (irange -5 15))
-        cr2 (crange 8 3 (irange 0 10))]
-    (?= (count (.ranges cr1)) 1)
-    (?range= (first (.ranges cr1)) [0 10])
-    (?range= (-> cr1 .ranges first .limit) [-5 15])
-    (?= (count (.ranges cr2)) 2)
-    (?range= (-> cr2 .ranges first) [8 10])
-    (?range= (-> cr2 .ranges first .limit) [0 10])
-    (?range= (-> cr2 .ranges second) [0 3])
-    (?range= (-> cr2 .ranges second .limit) [0 10])))
+(deftest circular-range-first-and-rest
+  (let [cr1 (crange 0 10 (irange -5 15))]
+    (?range= (.first cr1) [0 10])
+    (?range= (.dropFirst cr1) [10 10])
+    (?range= (.limit cr1) [-5 15]))
+  (let [cr2 (crange 8 10 (irange 0 10))]
+    (r/expand! 3 cr2)
+    (?range= (.first cr2) [8 10])
+    (?range= (.dropFirst cr2) [0 3])
+    (?range= (.first cr2) [0 3])))
 
 (deftest range-proxy-making
   (let [r (irange 0 10)
@@ -144,7 +141,7 @@
     (?range= (.range pr) [7 10])))
 
 (deftest range-proxy-read-and-write
-  (let [r (proxy [Range] [0 10]
+  (let [r (proxy [IntegerRange] [0 10]
             (write [seq] (throw (UnsupportedOperationException. "Writing to proxies is OK")))
             (read [seq] (throw (UnsupportedOperationException. "Reading from proxies is OK"))))
         pr (r/proxy r)]
@@ -152,7 +149,7 @@
     (?throws (r/read! pr nil) UnsupportedOperationException "Reading from proxies is OK")))
 
 (deftest read-only-and-write-only-proxies
-  (let [r (proxy [Range] [0 10] (write [seq] nil) (read [seq] nil))
+  (let [r (proxy [IntegerRange] [0 10] (write [seq] this) (read [seq] this))
         rp (r/proxy r :read-only)
         wp (r/proxy r :write-only)]
     (?= (r/read! rp nil) rp)
@@ -166,32 +163,30 @@
     (?range= (.range (r/expand 1000 p)) [0 10])))
 
 (defn- srange [begin end coll]
-  (let [coll (atom coll)]
-    (proxy [CircularRange clojure.lang.Seqable clojure.lang.Counted]
-        [begin end (irange 0 (count @coll))]
-      (seq [] (seq (mapcat #(->> @coll (take (.end %)) (drop (.begin %))) (.ranges this))))
+  (let [coll (atom coll)
+        writer (fn [dst src]
+                 (if (isa? (type src) clojure.lang.Seqable)
+                   (let [write-size (min (count dst) (count src))]
+                     (reset! coll (concat (take (.begin dst) @coll)
+                                          (take write-size (seq src))
+                                          (drop (+ (.begin dst) write-size) @coll)))
+                     (r/drop! write-size src)
+                     (r/drop! write-size dst)
+                     dst)))]
+    (proxy [IntegerRange clojure.lang.Seqable clojure.lang.Counted] [begin end]
+      (seq [] (seq (->> @coll (take (.end this)) (drop (.begin this)))))
       (count [] (r/size this))
-      (write [ts] 
-        (if (isa? (type ts) clojure.lang.Seqable)
-          (letfn [(write- [dst src]
-                    (let [write-size (min (count dst) (count src))]
-                      (reset! coll (concat (take (.begin dst) @coll)
-                                           (take write-size (seq src))
-                                           (drop (+ (.begin dst) write-size) @coll)))
-                      (r/drop! write-size dst)
-                      (r/drop! write-size src)
-                      write-size))]
-            (let [write-size (reduce (fn [size r] (+ size (write- r ts))) 0 (.ranges this))]
-              (r/drop! write-size this)))))
+      (write [src] (writer this src))
       (read [ts] nil))))
 
 (defn- another-range [begin end coll]
-  (let [sr (srange begin end coll)]
-    (r/proxy sr
+  (let [range (srange begin end coll)]
+    (r/proxy range
       (write [ts] nil)
-      (read [ts] (if (isa? (type ts) ProxyRange)
-                   (do (r/read! sr (.range ts)) this)
-                   (do (r/read! sr ts) this))))))
+      (read [ts]
+         (if (isa? (type ts) ProxyRange)
+           (do (r/read! range (.range ts)) this)
+           (do (r/read! range ts) this))))))
 
 (deftest simple-seq-based-range
   (let [r (srange 2 5 (range 10))]
@@ -233,19 +228,31 @@
       (?= (seq r1) [3 nil nil])
       (?= (seq r2) [3 nil nil]))))
 
-(deftest reading-and-writing-from-circular-range-ranges
-  (let [r1 (srange 3 1 (repeat 5 nil))
-        r2 (srange 2 1 [1 2 3 4])]
-    (let [[r11 r12] (.ranges r1)]
-      (?range= r11 [3 5])
-      (?range= r12 [0 1])
-      (?range= (r/write! r11 r2) [5 5])
-      (?= (seq r1) [3 4 nil])))
-  (let [r1 (another-range 3 1 (repeat 5 nil))
-        r2 (another-range 2 1 [1 2 3 4])]
-    (let [[r11 r12] (.ranges (.range r1))]
-      (?range= (.range (r/read! r2 r11)) [4 1])
-      (?= (seq (.range r1)) [3 4 nil]))))
+(defn- circular [generator begin end coll]
+  (if (<= begin end)
+    (proxy [CircularRange clojure.lang.Seqable clojure.lang.Counted]
+        [(generator begin end coll) (irange 0 (count coll))]
+      (seq [] (seq (concat (seq (.first this))
+                           (seq (-> this .clone .dropFirst .first)))))
+      (count [] (count (seq this))))
+    (doto (circular generator begin (count coll) coll)
+      (.expand end))))
+
+(deftest reading-and-writing-from-circular-ranges
+  (let [r1 (circular srange 3 1 (repeat 5 nil))
+        rc (.clone r1)
+        r2 (circular srange 2 1 [1 2 3 4])]
+    (?range= (r/write! r1 r2) [1 1])
+    (?= (seq rc) [3 4 1])
+    (?range= r2 [1 1]))
+  (let [r1 (circular another-range 3 1 (repeat 5 nil))
+        rc (.clone r1)
+        r2 (circular another-range 4 2 (range 6))]
+    (r/write! r1 r2)
+    (?range= (.first r1) [1 1])
+    (?range= (.first r2) [1 2])
+    (?= (seq (.range (.first rc))) [4 5])
+    (?= (seq (.range (.first (.dropFirst rc)))) [0])))
 
 (defn- link! [range prev next]
   (LinkedRange. range prev next))

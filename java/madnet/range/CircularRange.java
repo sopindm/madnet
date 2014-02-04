@@ -4,86 +4,105 @@ import java.util.ArrayList;
 
 public class CircularRange extends Range
 {
+    private Range range;
     private Range limit;
+    private int tail;
 
-    public CircularRange(int begin, int end, Range limit) throws Exception {
-        super(begin, end, false);
-        this.limit = limit.clone();
+    public CircularRange(Range range, Range limit) throws Exception {
+        super(range.begin(), range.end());
+        this.range = range;
+        this.tail = 0;
+        this.limit = limit;
 
-        if(begin < limit.begin() || end > limit.end())
+        if(range.begin() < limit.begin() || range.end() > limit.end())
             throw new IllegalArgumentException();
     }
 
-    public Range limit() throws Exception {
-        return limit.clone();
+    public Range first() {
+        return range;
     }
 
-    private void applyLimit() {
-        while(begin() > limit.end())
-            begin(begin() - limit.size());
-
-        while(end() > limit.end())
-            end(end() - limit.size());
+    public CircularRange dropFirst() throws Exception {
+        drop(range.size());
+        return this;
     }
 
-    public Integer size() {
-        if(begin() <= end())
-            return super.size();
+    public Range limit() {
+        return limit;
+    }
 
-        return (limit.end() - begin()) + (end() - limit.begin());
+    public int begin() {
+        return range.begin();
+    }
+
+    public int end() {
+        if(range.end() < limit.end())
+            return range.end();
+        
+        return limit.begin() + tail;
+    }
+
+    protected CircularRange begin(int n) {
+        if(n >= limit.end()) {
+            range.begin(limit.begin() + n - limit.end());
+            range.end(tail);
+
+            tail = 0;
+        }
+        else
+            range.begin(n);
+
+        return this;
+    }
+
+    protected CircularRange end(int n) {
+        if(n < begin()) {
+            tail = n - limit.begin();
+            return this;
+        }
+
+        if(n >= limit.end()) {
+            range.end(limit.end());
+            tail = n - limit.end();
+        }
+        else
+            range.end(n);
+
+        return this;
+    }
+
+    public int size() {
+        return range.size() + tail;
     }
 
     public CircularRange clone() throws CloneNotSupportedException {
         CircularRange range = (CircularRange)super.clone();
-        range.limit = limit.clone();
+        range.range = this.range.clone();
+        range.limit = this.limit.clone();
         return range;
     }
 
-    public CircularRange take(int n) throws Exception {
-        super.take(n);
-        applyLimit();
+    public CircularRange write(IRange range) throws Exception {
+        if(this.range.write(range) == null && range.read(this.range) == null)
+            return null;
 
-        return this;
+        if(this.range.size() > 0 || range.size() == 0 || size() == 0)
+            return this;
+
+        begin(this.range.begin());
+
+        return write(range);
     }
 
-    public CircularRange takeLast(int n) throws Exception {
-        super.takeLast(n);
-        applyLimit();
+    public CircularRange read(IRange range) throws Exception {
+        if(this.range.read(range) == null && range.write(this.range) == null)
+            return null;
 
-        return this;
-    }
+        if(this.range.size() > 0 || range.size() == 0 || size() == 0)
+            return this;
 
-    public CircularRange drop(int n) throws Exception {
-        super.drop(n);
-        applyLimit();
+        begin(this.range.begin());
 
-        return this;
-    }
-
-    public CircularRange dropLast(int n) throws Exception {
-        super.dropLast(n);
-        applyLimit();
-
-        return this;
-    }
-
-    public CircularRange expand(int n) throws Exception {
-        super.expand(n);
-        applyLimit();
-
-        return this;
-    }
-
-    public Iterable<Range> ranges() throws Exception {
-        ArrayList<Range> rangesList = new ArrayList<Range>();
-
-        if(begin() <= end()) {
-            rangesList.add(clone());
-            return rangesList;
-        }
-            
-        rangesList.add(clone().take(limit.end() - begin()));
-        rangesList.add(clone().takeLast(end() - limit.begin()));
-        return rangesList;
+        return read(range); 
     }
 }

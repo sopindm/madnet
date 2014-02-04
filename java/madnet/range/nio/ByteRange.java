@@ -5,12 +5,19 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 
 public class ByteRange extends Range implements Iterable<Byte> {
-    public ByteRange(int begin, int end, ByteBuffer buffer) {
+    public ByteRange(int begin, int end, ByteBuffer buffer) throws Exception {
         super(begin, end, buffer.duplicate());
     }
 
     public ByteBuffer buffer() {
         return (ByteBuffer)super.buffer();
+    }
+
+    public ByteRange clone() throws CloneNotSupportedException {
+        ByteRange r = (ByteRange)super.clone();
+        r.buffer = buffer().duplicate();
+
+        return r;
     }
 
     public byte get(int n) {
@@ -46,14 +53,15 @@ public class ByteRange extends Range implements Iterable<Byte> {
         ByteRange br = (ByteRange)range;
 
         if(br.size() > size()) {
-            buffer().put((ByteBuffer)br.buffer().duplicate().limit(br.begin() + size()));
-            br.drop(size());
-        }
-        else
-            buffer().put(br.buffer());
+            int size = size();
 
-        syncToBuffer();
-        br.syncToBuffer();
+            buffer().put((ByteBuffer)br.buffer().duplicate().limit(br.begin() + size()));
+            br.drop(size);
+        }
+        else {
+            buffer().put(br.buffer());
+            br.drop(br.size());
+        }
 
         return this;
     }

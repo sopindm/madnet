@@ -4,7 +4,10 @@ public interface IRange extends Cloneable
 {
     public IRange clone() throws CloneNotSupportedException;
 
-    public Integer size(); 
+    public int begin();
+    public int end();
+
+    public int size(); 
 
     public IRange take(int n) throws Exception;
     public IRange drop(int n) throws Exception;

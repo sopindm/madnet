@@ -5,7 +5,7 @@ public class LinkedRange extends ProxyRange
     private IRange prev;
     private IRange next;
 
-    public LinkedRange(IRange range, IRange prev, IRange next) {
+    public LinkedRange(Range range, IRange prev, IRange next) {
         super(range);
 
         this.prev = prev;

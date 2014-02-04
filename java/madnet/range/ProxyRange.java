@@ -1,11 +1,30 @@
 package madnet.range;
 
-public class ProxyRange implements IRange
+public class ProxyRange extends Range
 {
-    private IRange range;
+    private Range range;
 
-    public ProxyRange(IRange range) {
+    public ProxyRange(Range range) {
+        super(range.begin(), range.end());
         this.range = range;
+    }
+
+    public int begin() {
+        return range.begin();
+    }
+
+    protected ProxyRange begin(int n) {
+        range.begin(n);
+        return this;
+    }
+
+    public int end() {
+        return range.end();
+    }
+
+    protected ProxyRange end(int n) {
+        range.end(n);
+        return this;
     }
 
     public ProxyRange clone() throws CloneNotSupportedException {
@@ -15,11 +34,11 @@ public class ProxyRange implements IRange
         return pr;
     }
 
-    public IRange range() {
+    public Range range() {
         return this.range;
     }
 
-    public Integer size() {
+    public int size() {
         return range.size();
     }
 
@@ -49,12 +68,16 @@ public class ProxyRange implements IRange
     }        
 
     public ProxyRange write(IRange range) throws Exception {
-        this.range.write(range);
+        if(this.range.write(range) == null)
+            return null;
+
         return this;
     }
 
     public ProxyRange read(IRange range) throws Exception {
-        this.range.read(range);
+        if(this.range.read(range) == null)
+            return null;
+
         return this;
     }
 }
