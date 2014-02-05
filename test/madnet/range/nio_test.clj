@@ -3,9 +3,10 @@
             [madnet.range-test :refer :all]
             [madnet.range :as r]
             [madnet.range.nio :as n])
-  (:import [java.nio ByteBuffer]
+  (:import [java.nio ByteBuffer CharBuffer]
+           [java.nio.charset Charset]
            [madnet.range]
-           [madnet.range.nio Range ByteRange]))
+           [madnet.range.nio Range ByteRange CharRange]))
 
 (defmacro ?buffer= [expr position limit capacity]
   `(do (?= (.position ~expr) ~position)
@@ -33,8 +34,6 @@
     (?buffer= (.buffer r) 27 42 100)
     (?throws (r/expand! 59 r) IllegalArgumentException)
     (?throws (r/drop! 16 r) IndexOutOfBoundsException)))
-
-;nio range circular operations
 
 ;;
 ;; byte range
@@ -109,22 +108,76 @@
     (?range= dest [5 10])
     (?= (seq (r/take 5 dest-clone)) [2 3 4 5 6])))
 
-;circular writing to byte buffer
+(defn- char-range [begin end buffer]
+  (CharRange. begin end buffer))
 
-; circular nio range
-;;making
-;;operations
-;;ranges
-;;read/write
+(deftest making-char-range
+  (let [b (CharBuffer/allocate 10)
+        r (char-range 2 7 b)]
+    (?range= r [2 7])
+    (?range= (.clone r) [2 7])
+    (?true (isa? (type (.clone r)) CharRange))))
 
+(deftest char-range-random-access
+  (let [b (CharBuffer/allocate 10)
+        r (char-range 2 7 b)]
+    (.put b 4 \h)
+    (?= (.get r 2) \h)))
+
+(deftest char-range-as-seq
+  (let [b (CharBuffer/wrap "Hello, world!!!")
+        r (char-range 7 12 b)]
+    (?= (seq r) (seq "world"))))
+
+;char range writing/reading
+
+(defn- byte-buffer [seq]
+  )
+
+(defn- byte-range- [seq begin end]
+  (let [bb (byte-buffer seq)]
+    (byte-range begin end bb)))
+
+(deftest bytes-to-chars-conversion
+  (letfn [(byte-buffer [seq]
+            (let [bb (ByteBuffer/allocate (count seq))]
+              (dotimes [i (count seq)]
+                (.put bb i (byte (nth seq i))))
+              bb))
+          (byte-range- [begin end seq]
+            (byte-range begin end (byte-buffer seq)))
+          (char-range- [begin end size]
+            (char-range begin end (CharBuffer/allocate size)))
+          (?write= [cr br string]
+            (let [ccr (.clone cr)]
+              (.writeBytes cr br (Charset/forName "UTF8"))
+              (?= (seq ccr) (seq string))))]
+    (let [br (byte-range- 0 10 (map int "0123456789"))
+          cr (char-range- 0 10 10)]
+      (?write= cr br "0123456789")
+      (?range= br [10 10])
+      (?range= cr [10 10]))
+    (let [br (byte-range- 1 3 (map int "01234"))
+          cr (char-range- 4 8 10)]
+      (?write= cr br "12\0\0")
+      (?range= br [3 3])
+      (?range= cr [6 8]))
+    (let [br (byte-range- 1 9 (map int "0123456789"))
+          cr (char-range- 3 5 10)]
+      (?write= cr br "12")
+      (?range= br [3 9])
+      (?range= cr [5 5]))))
+
+;;bytes to chars errors
 ;char range
-;;random access
-;;iterable
 ;;converting to/from bytes
 ;;;conversion methods
-;;;convertors range
+;;;convertors range(CharSequence csq)
+        
 
-;ranges for byte[] and char[]
+;ranges for byte[] and char[]ap(CharSequence csq)
+
+
 
 
 
