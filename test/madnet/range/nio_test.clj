@@ -131,51 +131,67 @@
 
 ;char range writing/reading
 
-(defn- byte-buffer [seq]
-  )
-
-(defn- byte-range- [seq begin end]
-  (let [bb (byte-buffer seq)]
-    (byte-range begin end bb)))
-
-(deftest bytes-to-chars-conversion
-  (letfn [(byte-buffer [seq]
-            (let [bb (ByteBuffer/allocate (count seq))]
-              (dotimes [i (count seq)]
-                (.put bb i (byte (nth seq i))))
-              bb))
-          (byte-range- [begin end seq]
-            (byte-range begin end (byte-buffer seq)))
-          (char-range- [begin end size]
-            (char-range begin end (CharBuffer/allocate size)))
-          (?write= [cr br string]
-            (let [ccr (.clone cr)]
-              (.writeBytes cr br (Charset/forName "UTF8"))
-              (?= (seq ccr) (seq string))))]
+(letfn [(byte-buffer [seq]
+          (let [bb (ByteBuffer/allocate (count seq))]
+            (dotimes [i (count seq)]
+              (.put bb i (byte (nth seq i))))
+            bb))
+        (char-buffer [seq]
+          (let [cb (CharBuffer/allocate (count seq))]
+            (dotimes [i (count seq)]
+              (.put cb i (nth seq i)))
+            cb))
+        (byte-range- [begin end seq]
+          (byte-range begin end (byte-buffer seq)))
+        (char-range- [begin end seq]
+          (char-range begin end (char-buffer seq)))
+        (?write= [cr br string]
+          (let [ccr (.clone cr)]
+            (.writeBytes cr br (Charset/forName "UTF8"))
+            (?= (seq ccr) (seq string))))
+        (?read= [cr br bytes]
+          (let [cbr (.clone br)]
+            (.readBytes cr br (Charset/forName "UTF8"))
+            (?= (seq cbr) bytes)))]
+  (deftest bytes-to-chars-conversion
     (let [br (byte-range- 0 10 (map int "0123456789"))
-          cr (char-range- 0 10 10)]
+          cr (char-range- 0 10 (repeat 10 (char 0)))]
       (?write= cr br "0123456789")
       (?range= br [10 10])
       (?range= cr [10 10]))
     (let [br (byte-range- 1 3 (map int "01234"))
-          cr (char-range- 4 8 10)]
+          cr (char-range- 4 8 (repeat 10 (char 0)))]
       (?write= cr br "12\0\0")
       (?range= br [3 3])
       (?range= cr [6 8]))
     (let [br (byte-range- 1 9 (map int "0123456789"))
-          cr (char-range- 3 5 10)]
+          cr (char-range- 3 5 (repeat 10 (char 0)))]
       (?write= cr br "12")
       (?range= br [3 9])
-      (?range= cr [5 5]))))
+      (?range= cr [5 5])))
+  (deftest chars-to-bytes-conversion
+    (let [br (byte-range- 0 10 (repeat 10 0))
+          cr (char-range- 0 10 "abcdefghij")]
+      (?read= cr br [97 98 99 100 101 102 103 104 105 106])
+      (?range= br [10 10])
+      (?range= cr [10 10]))
+    (let [br (byte-range- 0 2 (repeat 2 0))
+          cr (char-range- 0 5 "abcde")]
+      (?read= cr br [97 98])
+      (?range= br [2 2])
+      (?range= cr [2 5]))
+    (let [br (byte-range- 0 5 (repeat 5 0))
+          cr (char-range- 0 2 "abcde")]
+      (?read= cr br [97 98 0 0 0])
+      (?range= br [2 5])
+      (?range= cr [2 2])))
+  (deftest error-converting-bytes-to-chars
+    (?throws (.writeBytes (char-range- 0 10 (repeat 10 (char 0)))
+                          (byte-range- 0 1 [-1])
+                          (Charset/forName "UTF8"))
+             java.nio.charset.CharacterCodingException)))
 
-;;bytes to chars errors
-;char range
-;;converting to/from bytes
-;;;conversion methods
-;;;convertors range(CharSequence csq)
-        
-
-;ranges for byte[] and char[]ap(CharSequence csq)
+;ranges for byte[] and char[]
 
 
 

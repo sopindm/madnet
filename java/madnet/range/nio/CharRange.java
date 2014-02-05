@@ -4,7 +4,9 @@ import madnet.range.IRange;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
+import java.nio.charset.CharacterCodingException;
 import java.util.Iterator;
 
 public class CharRange extends Range implements Iterable<Character> {
@@ -49,10 +51,23 @@ public class CharRange extends Range implements Iterable<Character> {
         };
     }
 
-    public CharRange writeBytes(ByteRange bytes, Charset charset) {
+    public CharRange writeBytes(ByteRange bytes, Charset charset) throws Exception {
         CharsetDecoder decoder = charset.newDecoder();
-        decoder.decode(bytes.buffer(), buffer(), true);
+        CoderResult result = decoder.decode(bytes.buffer(), buffer(), true);
 
+        if(result.isError())
+            throw new CharacterCodingException();
+        
+        return this;
+    }
+
+    public CharRange readBytes(ByteRange bytes, Charset charset) throws Exception {
+        CharsetEncoder encoder = charset.newEncoder();
+        CoderResult result = encoder.encode(buffer(), bytes.buffer(), true);
+
+        if(result.isError())
+            throw new CharacterCodingException();
+        
         return this;
     }
 }
