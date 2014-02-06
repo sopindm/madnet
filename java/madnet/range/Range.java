@@ -1,5 +1,7 @@
 package madnet.range;
 
+import madnet.channel.IChannel;
+
 abstract public class Range implements IRange
 {
     public Range(int begin, int end) {
@@ -50,11 +52,11 @@ abstract public class Range implements IRange
         return end(end() + n);
     }
 
-    public IRange read(IRange range) throws Exception {
+    public IChannel read(IChannel range) throws Exception {
         return null;
     }
 
-    public IRange write(IRange range) throws Exception {
+    public IChannel write(IChannel range) throws Exception {
         return null;
     }
 }

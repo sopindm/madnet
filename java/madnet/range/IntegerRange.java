@@ -12,14 +12,17 @@ public class IntegerRange extends Range
         this.end = end;
     }
 
+    @Override
     public int begin() {
         return begin;
     }
 
+    @Override
     public int end() {
         return end;
     }
 
+    @Override
     protected IntegerRange begin(int n) {
         this.begin = n;
 
@@ -29,6 +32,7 @@ public class IntegerRange extends Range
         return this;
     }
 
+    @Override
     protected IntegerRange end(int n) {
         this.end = n;
 
@@ -38,6 +42,7 @@ public class IntegerRange extends Range
         return this;
     }
 
+    @Override
     public int size() {
         return end() - begin();
     }

@@ -20,6 +20,7 @@ public class LinkedRange extends ProxyRange
         return this.prev; 
     }
 
+    @Override
     public LinkedRange drop(int n) throws Exception {
         super.drop(n);
         if(prev != null)
@@ -28,6 +29,7 @@ public class LinkedRange extends ProxyRange
         return this;
     }
 
+    @Override
     public LinkedRange expand(int n) throws Exception {
         super.expand(n);
         if(next != null)

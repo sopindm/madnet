@@ -14,10 +14,12 @@ public class CharRange extends Range implements Iterable<Character> {
         super(begin, end, buffer.duplicate());
     }
 
+    @Override
     public CharBuffer buffer() {
         return (CharBuffer)super.buffer();
     }
 
+    @Override
     public CharRange clone() throws CloneNotSupportedException {
         CharRange r = (CharRange)super.clone();
         r.buffer = buffer().duplicate();
@@ -31,18 +33,17 @@ public class CharRange extends Range implements Iterable<Character> {
 
     public Iterator<Character> iterator() {
         return new Iterator<Character>() {
-            int position = begin();
+            CharBuffer buffer = buffer().duplicate();
 
             public boolean hasNext() {
-                return position < end();
+                return buffer.position() != buffer.limit();
             }
 
             public Character next() {
                 if(!hasNext())
                     throw new java.util.NoSuchElementException();
 
-                position++;
-                return buffer().get(position - 1);
+                return buffer.get();
             }
 
             public void remove() {
@@ -51,11 +52,12 @@ public class CharRange extends Range implements Iterable<Character> {
         };
     }
 
-    public CharRange write(IRange range) throws Exception {
-        if(!(range instanceof CharRange))
+    @Override
+    public CharRange write(madnet.channel.IChannel ch) throws Exception {
+        if(!(ch instanceof CharRange))
             return null;
 
-        CharRange src = (CharRange)range;
+        CharRange src = (CharRange)ch;
 
         if(src.size() > size()) {
             int size = size();

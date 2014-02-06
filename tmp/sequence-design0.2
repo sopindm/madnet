@@ -2,31 +2,6 @@
   (read [this channel])
   (write [this readable]))
 
-(defprotocol IRange [IChannel]
-  (begin [this]) ;integer or null (neg infinity)
-  (end [this]) ;integer or null (pos infinity)
-  (take [this n])
-  (drop [this n])
-  (take-last [this n])
-  (drop-last [this n])
-  (expand [this n])
-  (read [this range])
-  (write [this range]))
-
-(defclass ARange [^Integer begin ^Integer end]
-  (begin [this])
-  (end [this])
-  (take [this n])
-  (drop [this n])
-  (take-last [this n])
-  (drop-last [this n])
-  (expand [this n]))
-
-(defclass CircularRange [^Integer begin ^Integer end ^Integer size] ...)
-
-(defclass RangeProxy [range])
-(defclass LinkedRange [RangeProxy] [range prev next])
-
 (defprotocol ISequence [Iterable ISeqable IClonable]
   (^ISequenceReader reader [this])
   (^ISequenceWriter writer [this])
@@ -38,6 +13,10 @@
   (read [this seq])
   (write [this seq]))              
 
-(defclass ASequence [ISequence] [buffer ^IRange readAt ^IRange writeAt])
+(defprotocol IBuffer
+  (size [this])
+  (range [begin end]))
+
+(defclass ASequence [ISequence] [buffer ^IntegerRange readAt ^IntegerRange writeAt])
 
           

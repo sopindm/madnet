@@ -10,19 +10,23 @@ public class Range extends madnet.range.Range {
         this.buffer = buffer.position(begin).limit(end);
     }
 
+    @Override
     public int begin() {
         return buffer.position();
     }
 
+    @Override
     public int end() {
         return buffer.limit();
     }
 
+    @Override
     protected Range begin(int n) {
         buffer.position(n);
         return this;
     }
 
+    @Override
     protected Range end(int n) {
         buffer.limit(n);
         return this;

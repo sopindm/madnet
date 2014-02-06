@@ -1,5 +1,6 @@
 package madnet.range.nio;
 
+import madnet.channel.IChannel;
 import madnet.range.IRange;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
@@ -9,10 +10,12 @@ public class ByteRange extends Range implements Iterable<Byte> {
         super(begin, end, buffer.duplicate());
     }
 
+    @Override
     public ByteBuffer buffer() {
         return (ByteBuffer)super.buffer();
     }
 
+    @Override
     public ByteRange clone() throws CloneNotSupportedException {
         ByteRange r = (ByteRange)super.clone();
         r.buffer = buffer().duplicate();
@@ -26,18 +29,17 @@ public class ByteRange extends Range implements Iterable<Byte> {
 
     public Iterator<Byte> iterator() {
         return new Iterator<Byte>() {
-            int position = begin();
+            ByteBuffer buffer = buffer().duplicate();
 
             public boolean hasNext() {
-                return position < end();
+                return buffer.position() != buffer.limit();
             }
 
             public Byte next() {
                 if(!hasNext())
                     throw new java.util.NoSuchElementException();
 
-                position++;
-                return buffer().get(position - 1);
+                return buffer.get();
             }
 
             public void remove() {
@@ -46,11 +48,12 @@ public class ByteRange extends Range implements Iterable<Byte> {
         };
     }
 
-    public ByteRange write(IRange range) throws Exception {
-        if(!(range instanceof ByteRange))
+    @Override
+    public ByteRange write(IChannel ch) throws Exception {
+        if(!(ch instanceof ByteRange))
             return null;
 
-        ByteRange br = (ByteRange)range;
+        ByteRange br = (ByteRange)ch;
 
         if(br.size() > size()) {
             int size = size();

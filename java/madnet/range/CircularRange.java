@@ -1,6 +1,7 @@
 package madnet.range;
 
 import java.util.ArrayList;
+import madnet.channel.IChannel;
 
 public class CircularRange extends Range
 {
@@ -31,10 +32,12 @@ public class CircularRange extends Range
         return limit;
     }
 
+    @Override
     public int begin() {
         return range.begin();
     }
 
+    @Override
     public int end() {
         if(range.end() < limit.end())
             return range.end();
@@ -42,6 +45,7 @@ public class CircularRange extends Range
         return limit.begin() + tail;
     }
 
+    @Override
     protected CircularRange begin(int n) {
         if(n >= limit.end()) {
             range.begin(limit.begin() + n - limit.end());
@@ -55,6 +59,7 @@ public class CircularRange extends Range
         return this;
     }
 
+    @Override
     protected CircularRange end(int n) {
         if(n < begin()) {
             tail = n - limit.begin();
@@ -71,10 +76,12 @@ public class CircularRange extends Range
         return this;
     }
 
+    @Override
     public int size() {
         return range.size() + tail;
     }
 
+    @Override
     public CircularRange clone() throws CloneNotSupportedException {
         CircularRange range = (CircularRange)super.clone();
         range.range = this.range.clone();
@@ -82,27 +89,29 @@ public class CircularRange extends Range
         return range;
     }
 
-    public CircularRange write(IRange range) throws Exception {
-        if(this.range.write(range) == null && range.read(this.range) == null)
+    @Override
+    public CircularRange write(IChannel ch) throws Exception {
+        if(this.range.write(ch) == null && ch.read(this.range) == null)
             return null;
 
-        if(this.range.size() > 0 || range.size() == 0 || size() == 0)
+        if(this.range.size() > 0 || size() == 0)
             return this;
 
         begin(this.range.begin());
 
-        return write(range);
+        return write(ch);
     }
 
-    public CircularRange read(IRange range) throws Exception {
-        if(this.range.read(range) == null && range.write(this.range) == null)
+    @Override
+    public CircularRange read(IChannel ch) throws Exception {
+        if(this.range.read(ch) == null && ch.write(this.range) == null)
             return null;
 
-        if(this.range.size() > 0 || range.size() == 0 || size() == 0)
+        if(this.range.size() > 0 || size() == 0)
             return this;
 
         begin(this.range.begin());
 
-        return read(range); 
+        return read(ch); 
     }
 }
