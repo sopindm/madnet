@@ -58,10 +58,8 @@ public class ByteRange extends Range implements Iterable<Byte> {
             buffer().put((ByteBuffer)br.buffer().duplicate().limit(br.begin() + size()));
             br.drop(size);
         }
-        else {
+        else 
             buffer().put(br.buffer());
-            br.drop(br.size());
-        }
 
         return this;
     }

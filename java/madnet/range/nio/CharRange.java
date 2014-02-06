@@ -51,6 +51,24 @@ public class CharRange extends Range implements Iterable<Character> {
         };
     }
 
+    public CharRange write(IRange range) throws Exception {
+        if(!(range instanceof CharRange))
+            return null;
+
+        CharRange src = (CharRange)range;
+
+        if(src.size() > size()) {
+            int size = size();
+
+            buffer().put((CharBuffer)src.buffer().duplicate().limit(size));
+            src.drop(size);
+        }
+        else
+            buffer().put(src.buffer());
+
+        return this;
+    }
+
     public CharRange writeBytes(ByteRange bytes, Charset charset) throws Exception {
         CharsetDecoder decoder = charset.newDecoder();
         CoderResult result = decoder.decode(bytes.buffer(), buffer(), true);

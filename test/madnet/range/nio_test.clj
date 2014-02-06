@@ -129,7 +129,28 @@
         r (char-range 7 12 b)]
     (?= (seq r) (seq "world"))))
 
-;char range writing/reading
+(deftest writing-char-range-to-char-range
+  (letfn [(char-range- [begin end chars]
+            (char-range begin end (CharBuffer/wrap (char-array chars))))
+          (?write= [dst src str]
+            (let [clone (.clone dst)]
+              (r/write! dst src)
+              (?= (seq clone) (seq str))))]
+    (let [src (char-range- 0 5 "Hello")
+          dst (char-range- 0 5 5)]
+      (?write= dst src "Hello")
+      (?range= dst [5 5])
+      (?range= src [5 5]))
+    (let [src (char-range- 0 2 "Hi")
+          dst (char-range- 0 5 5)]
+      (?write= dst src "Hi\0\0\0")
+      (?range= dst [2 5])
+      (?range= src [2 2]))
+    (let [src (char-range- 0 5 "Hello")
+          dst (char-range- 1 5 5)]
+      (?write= dst src "Hell")
+      (?range= dst [5 5])
+      (?range= src [4 5]))))
 
 (letfn [(byte-buffer [seq]
           (let [bb (ByteBuffer/allocate (count seq))]
@@ -191,7 +212,6 @@
                           (Charset/forName "UTF8"))
              java.nio.charset.CharacterCodingException)))
 
-;ranges for byte[] and char[]
 
 
 
