@@ -1,0 +1,29 @@
+(buffer 1000)
+(buffer 100 :circular true)
+(buffer 1000 :element :byte)
+(buffer 1000 :element :char)
+
+(range buffer 0 100)
+(range (assoc buffer :circular nil) 0 100)
+
+(defmulti buffer [size & {element :element :as args}])
+
+(defn buffer [size & options]
+
+(sequence [1000 :circular [:element :byte] :direct] [0 0] [0 1000])
+
+(stack proxy1
+       proxy2
+       ...
+       proxyN
+       true-seq)
+
+(push stack (bomb 0.1))
+
+(def http-reader
+  (chain
+    (reader *my-tcp-socket*) :: Nothing -> bytes
+    (byte->char 1024) :: bytes->chars
+    (char->line 1024) :: chars->strings
+    (http-parser) :: strings->http-requests))
+  

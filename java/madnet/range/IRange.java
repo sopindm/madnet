@@ -1,6 +1,6 @@
 package madnet.range;
 
-public interface IRange extends Cloneable, madnet.channel.IChannel
+public interface IRange extends Cloneable, madnet.channel.IChannel, Iterable
 {
     public IRange clone() throws CloneNotSupportedException;
 

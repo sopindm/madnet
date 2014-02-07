@@ -1,17 +1,12 @@
-(defprotocol IChannel
-  (read [this channel])
-  (write [this readable]))
+channel is a queue!!!
 
-(defprotocol ISequence [Iterable ISeqable IClonable]
+(defprotocol ISequence [Iterable ISeqable IClonable IChannel]
   (^ISequenceReader reader [this])
   (^ISequenceWriter writer [this])
   (size [this] (size reader))
   (free-space [this] (size writer))
           (iterator [this]) ;over reader
-  (get [this index]) ;in reader
-  (seq [this]) ;seq reader
-  (read [this seq])
-  (write [this seq]))              
+  (get [this index]) ;in reader)
 
 (defprotocol IBuffer
   (size [this])

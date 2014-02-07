@@ -9,7 +9,7 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CharacterCodingException;
 import java.util.Iterator;
 
-public class CharRange extends Range implements Iterable<Character> {
+public class CharRange extends Range {
     public CharRange(int begin, int end, CharBuffer buffer) throws Exception {
         super(begin, end, buffer.duplicate());
     }
@@ -31,6 +31,7 @@ public class CharRange extends Range implements Iterable<Character> {
         return buffer().get(begin() + i);
     } 
 
+    @Override
     public Iterator<Character> iterator() {
         return new Iterator<Character>() {
             CharBuffer buffer = buffer().duplicate();

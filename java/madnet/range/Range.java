@@ -59,4 +59,8 @@ abstract public class Range implements IRange
     public IChannel write(IChannel range) throws Exception {
         return null;
     }
+
+    public java.util.Iterator iterator() {
+        throw new UnsupportedOperationException();
+    }
 }

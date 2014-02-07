@@ -1,0 +1,24 @@
+/*
+Iterator extends ListIterator, Cloneable {
+    Iterator clone();
+
+    void forth();
+    void back();
+}
+
+ByteIterator extends Iterator {
+   byte nextByte();
+}
+
+CharIterator extends Iterator {
+   char nextChar();
+}*/
+
+range:
+  split-with
+  take-while
+  drop-while
+ 
+
+
+   

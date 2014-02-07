@@ -5,7 +5,7 @@ import madnet.range.IRange;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-public class ByteRange extends Range implements Iterable<Byte> {
+public class ByteRange extends Range {
     public ByteRange(int begin, int end, ByteBuffer buffer) throws Exception {
         super(begin, end, buffer.duplicate());
     }
@@ -27,6 +27,7 @@ public class ByteRange extends Range implements Iterable<Byte> {
         return buffer().get(begin() + n);
     }
 
+    @Override
     public Iterator<Byte> iterator() {
         return new Iterator<Byte>() {
             ByteBuffer buffer = buffer().duplicate();
