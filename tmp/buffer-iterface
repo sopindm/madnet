@@ -1,7 +1,9 @@
 (buffer 1000)
-(buffer 100 :circular true)
-(buffer 1000 :element :byte)
-(buffer 1000 :element :char)
+(buffer 100 :circular)
+(buffer 1000 [:element :byte])
+(buffer 1000 [:element :char])
+
+(buffer 0 100) -> range
 
 (range buffer 0 100)
 (range (assoc buffer :circular nil) 0 100)

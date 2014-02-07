@@ -1,6 +1,6 @@
 package madnet.range;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import madnet.channel.IChannel;
 
 public class CircularRange extends Range
@@ -39,7 +39,7 @@ public class CircularRange extends Range
 
     @Override
     public int end() {
-        if(range.end() < limit.end())
+        if(range.end() < limit.end() || tail == 0)
             return range.end();
         
         return limit.begin() + tail;
@@ -66,7 +66,7 @@ public class CircularRange extends Range
             return this;
         }
 
-        if(n >= limit.end()) {
+        if(n > limit.end()) {
             range.end(limit.end());
             tail = n - limit.end();
         }
@@ -87,6 +87,41 @@ public class CircularRange extends Range
         range.range = this.range.clone();
         range.limit = this.limit.clone();
         return range;
+    }
+
+    @Override
+    public Iterator iterator() {
+        if(begin() <= end())
+            return range.iterator();
+
+        final Iterator firstIterator = range.iterator();
+        final Iterator restIterator;
+        try {
+            restIterator = range.clone().begin(0).end(tail).iterator();
+        }
+        catch(CloneNotSupportedException e){
+            throw new RuntimeException(e);
+        }
+
+        return new Iterator() {
+            @Override
+            public boolean hasNext() { 
+                return firstIterator.hasNext() || restIterator.hasNext();
+            }
+
+            @Override
+            public Object next() {
+                if(firstIterator.hasNext())
+                    return firstIterator.next();
+
+                return restIterator.next();
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 
     @Override

@@ -11,6 +11,9 @@ public class ObjectRange extends IntegerRange {
         super(begin, end);
 
         this.buffer = buffer;
+
+        if(begin < 0 || end > buffer.size())
+            throw new IllegalArgumentException();
     }
 
     @Override 

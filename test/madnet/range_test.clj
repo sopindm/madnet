@@ -266,6 +266,9 @@
     (?= (seq (.range (.first rc))) [4 5])
     (?= (seq (.range (.first (.dropFirst rc)))) [0])))
 
+(deftest circular-range-iterator
+  (?= (seq (circular srange 3 1 (range 5))) [3 4 0]))
+
 (defn- link! [range prev next]
   (LinkedRange. range prev next))
 
@@ -316,7 +319,9 @@
 
 (deftest overexpanding-object-range
   (let [r (object-range 0 10 (repeat 10 nil))]
-    (?throws (r/expand! 1 r) IllegalArgumentException)))
+    (?throws (r/expand! 1 r) IllegalArgumentException))
+  (?throws (object-range 0 10 (repeat 5 nil)) IllegalArgumentException)
+  (?throws (object-range -1 10 (repeat 10 nil)) IllegalArgumentException))
 
 (deftest cloning-object-range
   (let [r (object-range 0 10 (range 10))
@@ -358,3 +363,50 @@
     (?range= ar [5 5])
     (?= (seq rc) (seq (concat (range 5) (repeat 5 nil))))))
 
+(deftest making-simple-buffer
+  (let [b (r/buffer 100)]
+    (?= (count b) 100)
+    (?range= (b 12 50) [12 50])
+    (?range= (b 15) [0 15])
+    (?range= (b) [0 100])
+    (?range= (b 0 80) [0 80])
+    (r/write (b 0 100) (object-range 0 100 (range 100)))
+    (?= (seq b) (seq (range 100)))))
+
+(deftest making-circular-buffers
+  (?true (r/circular? (r/buffer 10)))
+  (?true (r/circular? (r/buffer 10 :circular true)))
+  (?false (r/circular? (r/buffer 10 :circular false)))
+  (let [b (r/buffer 10 :circular true)]
+    (?range= (r/expand 5 (b 8 10)) [8 5])))
+
+(deftest making-buffers-with-element-type
+  (let [b (r/buffer 10 :element :object)]
+    (r/write (b) (object-range 0 5 (map #(format "%s" %) (range -2 3))))
+    (?= (seq b) ["-2" "-1" "0" "1" "2" nil nil nil nil nil]))
+  (let [b (r/buffer 5 :circular false :element :byte)]
+    (?range= (b) [0 5])
+    (?true (isa? (type (b)) madnet.range.nio.ByteRange)))
+  (let [b (r/buffer 10 :circular false :element :char)]
+    (?range= (b) [0 10])
+    (?true (isa? (type (b)) madnet.range.nio.CharRange)))
+  (?throws (r/buffer 10 :element :unknown) IllegalArgumentException))
+
+;buffer (range factory)
+;;direct and indirect buffers (nio)
+;;wrong options error 
+;;buffers from existing collections, byte and char arrays 
+
+;;(buffer (range 100) ...)
+;;(buffer (byte-array 10) ...) (no direct)
+;;(buffer (char-array 10) ...) (no direct)
+
+;;push and pop for ranges (queue)
+
+;sequence
+;;making sequence
+;;cloning sequence
+;;accessing sequence
+;;reading/writing sequence
+;;sequence reader/writer access
+;;push and pop for sequences (queue)

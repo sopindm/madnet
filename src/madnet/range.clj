@@ -1,6 +1,6 @@
 (ns madnet.range
   (:refer-clojure :exclude [take drop sequence take-last drop-last read range proxy])
-  (:import [madnet.range Range ProxyRange]))
+  (:import [madnet.range Range ProxyRange ObjectRange]))
 
 ;;
 ;; Range operation wrappers
@@ -88,3 +88,50 @@
         writen (.clone src)]
     (read! read writen)
     [read writen]))
+
+;;
+;; Buffers
+;;
+
+(deftype Buffer [generator size]
+  clojure.lang.Seqable
+  (seq [this] (seq (generator 0 size)))
+  clojure.lang.Counted
+  (count [this] size)
+  clojure.lang.IFn
+  (invoke [this] (generator 0 size))
+  (invoke [this end] (generator 0 end))
+  (invoke [this begin end] (generator begin end)))
+
+(defn- object-range-generator [size]
+  (let [coll (java.util.ArrayList. size)]
+    (dotimes [i size]
+      (.add coll nil))
+    (fn [begin end] (ObjectRange. begin end coll))))
+
+(defn- byte-range-generator [size options]
+  (let [b (java.nio.ByteBuffer/allocate size)]
+    (fn [begin end] (madnet.range.nio.ByteRange. begin end b))))
+
+(defn- char-range-generator [size options]
+  (let [b (java.nio.CharBuffer/allocate size)]
+    (fn [begin end] (madnet.range.nio.CharRange. begin end b))))
+
+(defn- circular-generator [generator size]
+  (fn [begin end] (madnet.range.CircularRange.
+                   (generator begin end)
+                   (madnet.range.IntegerRange. 0 size))))
+
+(defn buffer [size & options]
+  (let [{:keys [element] :as options} (apply sorted-map options)
+        generator (case element
+                    (:object nil) (object-range-generator size)
+                    :byte (byte-range-generator size options)
+                    :char (char-range-generator size options))]
+    (Buffer. (if (get options :circular true)
+               (circular-generator generator size)
+               generator)
+             size)))
+
+(defn circular? [buffer]
+  (isa? (type (buffer)) madnet.range.CircularRange))
