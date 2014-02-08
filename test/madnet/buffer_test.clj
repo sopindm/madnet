@@ -35,7 +35,7 @@
   (?throws (buffer 10 :element :unknown) IllegalArgumentException))
 
 (deftest direct-and-indirect-nio-buffers
-  (?false (direct? (buffer 10)))
+  (?= (direct? (buffer 10)) nil)
   (?false (direct? (buffer 10 :element :byte)))
   (?true (direct? (buffer 10 :element :byte :direct true)))
   (?false (-> ((buffer 10 :element :byte))
@@ -72,6 +72,17 @@
     (?= (seq b) (seq "01234"))
     (?true (isa? (type (b)) madnet.range.nio.CharRange))
     (?false (direct? b))))
+
+(deftest buffer-options
+  (?= (options (buffer 10)) {:element :object :circular false})
+  (?= (options (buffer 10 :circular true))
+      {:element :object :circular true})
+  (?= (options (buffer 10 :element :char))
+      {:element :char :circular false :direct false})
+  (?= (options (buffer 10 :element :byte :direct true))
+      {:element :byte :circular false :direct true}))
+
+;cloning buffers
 
 
 

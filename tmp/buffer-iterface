@@ -1,17 +1,3 @@
-(buffer 1000)
-(buffer 100 :circular)
-(buffer 1000 [:element :byte])
-(buffer 1000 [:element :char])
-
-(buffer 0 100) -> range
-
-(range buffer 0 100)
-(range (assoc buffer :circular nil) 0 100)
-
-(defmulti buffer [size & {element :element :as args}])
-
-(defn buffer [size & options]
-
 (sequence [1000 :circular [:element :byte] :direct] [0 0] [0 1000])
 
 (stack proxy1

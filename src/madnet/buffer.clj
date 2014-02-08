@@ -2,7 +2,7 @@
   (:import [madnet.range ObjectRange]
            [java.nio ByteBuffer CharBuffer]))
 
-(deftype Buffer [generator size]
+(deftype Buffer [generator element size]
   clojure.lang.Seqable
   (seq [this] (seq (generator 0 size)))
   clojure.lang.Counted
@@ -72,9 +72,10 @@
   (let [generator (generator size options)
         coll ((:buffer generator) size)
         range-generator (:range generator)]
-    (Buffer. (fn [begin end] (range-generator coll begin end)) size)))
+    (Buffer. (fn [begin end] (range-generator coll begin end))
+             (get (apply sorted-map options) :element :object) size)))
 
-(defn element-type [coll]
+(defn- element-type [coll]
   (let [type (type coll)]
     (cond 
      (isa? type (Class/forName "[B")) :byte
@@ -89,13 +90,28 @@
         generator (generator size options)
         coll ((:wrap generator) coll)
         range-generator (:range generator)]
-    (Buffer. (fn [begin end] (range-generator coll begin end)) size)))
+    (Buffer. (fn [begin end] (range-generator coll begin end))
+             element size)))
 
 (defn circular? [buffer]
   (isa? (type (buffer)) madnet.range.CircularRange))
 
+(defn- buffer-element-type [buffer]
+  (element-type (.buffer (if (circular? buffer)
+                           (.first (buffer))
+                           (buffer)))))
+
 (defn direct? [buffer]
   (let [range (buffer)
         linear (if (circular? buffer) (.first range) range)]
-    (and (isa? (type linear) madnet.range.nio.Range)
-         (.isDirect (.buffer linear)))))
+    (if (isa? (type linear) madnet.range.nio.Range)
+      (.isDirect (.buffer linear)))))
+
+(defn options [buffer]
+  (let [base-options {:element (.element buffer)
+                      :circular (circular? buffer)}
+        direct? (direct? buffer)]
+    (if (nil? direct?)
+      base-options
+      (assoc base-options :direct direct?))))
+        
