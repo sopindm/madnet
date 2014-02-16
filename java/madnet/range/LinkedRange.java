@@ -1,22 +1,25 @@
 package madnet.range;
 
+import madnet.channel.Result;
+import madnet.channel.IChannel;
+
 public class LinkedRange extends ProxyRange
 {
-    private IRange prev;
-    private IRange next;
+    private Range prev;
+    private Range next;
 
-    public LinkedRange(Range range, IRange prev, IRange next) {
+    public LinkedRange(Range range, Range prev, Range next) {
         super(range);
 
         this.prev = prev;
         this.next = next;
     }
 
-    public IRange next() {
+    public Range next() {
         return this.next;
     }
 
-    public IRange prev() {
+    public Range prev() {
         return this.prev; 
     }
 
@@ -36,5 +39,29 @@ public class LinkedRange extends ProxyRange
             next.drop(n);
 
         return this;
+    }
+
+    @Override
+    public Result write(IChannel ch) throws Exception {
+        Result result = super.write(ch);
+        if(result == null)
+            return result;
+
+        if(prev != null)
+            prev.expand(result.writen);
+
+        return result;
+    }
+
+    @Override
+    public Result read(IChannel ch) throws Exception {
+        Result result = super.read(ch);
+        if(result == null)
+            return result;
+
+        if(prev != null)
+            prev.expand(result.read);
+
+        return result;
     }
 }

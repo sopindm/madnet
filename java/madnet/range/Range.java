@@ -1,8 +1,10 @@
 package madnet.range;
 
 import madnet.channel.IChannel;
+import madnet.channel.Result;
 
-abstract public class Range implements IRange
+abstract public class Range extends madnet.channel.Channel
+    implements Iterable, Cloneable
 {
     public Range(int begin, int end) {
         if(begin > end)
@@ -12,6 +14,9 @@ abstract public class Range implements IRange
     public Range clone() throws CloneNotSupportedException {
         return (Range)super.clone();
     }
+
+    abstract public int begin();
+    abstract public int end();
 
     abstract protected Range begin(int n);
     abstract protected Range end(int n);
@@ -52,14 +57,17 @@ abstract public class Range implements IRange
         return end(end() + n);
     }
 
-    public IChannel read(IChannel range) throws Exception {
+    @Override
+    public Result read(IChannel range) throws Exception {
         return null;
     }
 
-    public IChannel write(IChannel range) throws Exception {
+    @Override
+    public Result write(IChannel range) throws Exception {
         return null;
     }
 
+    @Override
     public java.util.Iterator iterator() {
         throw new UnsupportedOperationException();
     }

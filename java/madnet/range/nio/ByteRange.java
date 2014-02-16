@@ -1,7 +1,7 @@
 package madnet.range.nio;
 
 import madnet.channel.IChannel;
-import madnet.range.IRange;
+import madnet.channel.Result;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -50,21 +50,21 @@ public class ByteRange extends Range {
     }
 
     @Override
-    public ByteRange write(IChannel ch) throws Exception {
+    public Result write(IChannel ch) throws Exception {
         if(!(ch instanceof ByteRange))
             return null;
 
         ByteRange br = (ByteRange)ch;
 
-        if(br.size() > size()) {
-            int size = size();
+        int writeSize = Math.min(br.size(), size());
 
+        if(writeSize < br.size()) {
             buffer().put((ByteBuffer)br.buffer().duplicate().limit(br.begin() + size()));
-            br.drop(size);
+            br.drop(writeSize);
         }
         else 
             buffer().put(br.buffer());
 
-        return this;
+        return new Result(writeSize, writeSize);
     }
 }

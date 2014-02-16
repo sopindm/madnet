@@ -62,18 +62,19 @@
       :char (char-range-generator options))))
 
 (defn- generator [size options]
-  (let [options (apply sorted-map options)
-        circular? (get options :circular false)
+  (let [circular? (get options :circular false)
         options (dissoc options :circular)
         generator (primitive-generator options)]
     (if circular? (circular-generator generator size) generator)))
 
-(defn buffer [size & options]
-  (let [generator (generator size options)
-        coll ((:buffer generator) size)
-        range-generator (:range generator)]
-    (Buffer. (fn [begin end] (range-generator coll begin end))
-             (get (apply sorted-map options) :element :object) size)))
+(defn buffer
+  ([size] (buffer size {}))
+  ([size options]
+     (let [generator (generator size options)
+           coll ((:buffer generator) size)
+           range-generator (:range generator)]
+       (Buffer. (fn [begin end] (range-generator coll begin end))
+                (get options :element :object) size))))
 
 (defn- element-type [coll]
   (let [type (type coll)]
@@ -82,16 +83,18 @@
      (isa? type (Class/forName "[C")) :char
      :else :object)))
 
-(defn wrap [coll & options]
-  (check-no-options (apply sorted-map options) #{:element})
-  (let [element (element-type coll)
-        options (concat [:element element] options)
-        size (count coll)
-        generator (generator size options)
-        coll ((:wrap generator) coll)
-        range-generator (:range generator)]
-    (Buffer. (fn [begin end] (range-generator coll begin end))
-             element size)))
+(defn wrap
+  ([coll] (wrap coll nil))
+  ([coll options]
+     (check-no-options options #{:element})
+     (let [element (element-type coll)
+           options (assoc options :element element)
+           size (count coll)
+           generator (generator size options)
+           coll ((:wrap generator) coll)
+           range-generator (:range generator)]
+       (Buffer. (fn [begin end] (range-generator coll begin end))
+                element size))))
 
 (defn circular? [buffer]
   (isa? (type (buffer)) madnet.range.CircularRange))

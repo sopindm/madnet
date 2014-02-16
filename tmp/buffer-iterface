@@ -1,3 +1,9 @@
+(sequence buffer)
+(sequence buffer :read read-at)
+(sequence buffer :read read-at :write write-at)
+
+(sequence [...])
+
 (sequence [1000 :circular [:element :byte] :direct] [0 0] [0 1000])
 
 (stack proxy1
@@ -13,5 +19,10 @@
     (reader *my-tcp-socket*) :: Nothing -> bytes
     (byte->char 1024) :: bytes->chars
     (char->line 1024) :: chars->strings
-    (http-parser) :: strings->http-requests))
-  
+    (http-parser))) :: strings->http-requests
+    
+(def http-writer
+  (chain
+    (http->char)
+    (char->byte)
+    (writer tcp)

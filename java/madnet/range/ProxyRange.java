@@ -1,5 +1,8 @@
 package madnet.range;
 
+import madnet.channel.Result;
+import java.util.Iterator;
+
 public class ProxyRange extends Range
 {
     private Range range;
@@ -37,6 +40,11 @@ public class ProxyRange extends Range
         pr.range = pr.range.clone();
 
         return pr;
+    }
+
+    @Override
+    public Iterator iterator() {
+        return range.iterator();
     }
 
     public Range range() {
@@ -79,18 +87,20 @@ public class ProxyRange extends Range
     }        
 
     @Override
-    public ProxyRange write(madnet.channel.IChannel ch) throws Exception {
-        if(this.range.write(ch) == null)
-            return null;
+    public Result write(madnet.channel.IChannel ch) throws Exception {
+        Result writeResult = range.write(ch);
+        if(writeResult != null)
+            return writeResult;
 
-        return this;
+        return ch.read(range);
     }
 
     @Override
-    public ProxyRange read(madnet.channel.IChannel ch) throws Exception {
-        if(this.range.read(ch) == null)
-            return null;
+    public Result read(madnet.channel.IChannel ch) throws Exception {
+        Result readResult = range.read(ch);
+        if(readResult != null)
+            return readResult;
 
-        return this;
+        return ch.write(range);
     }
 }

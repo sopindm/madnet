@@ -1,5 +1,5 @@
 (ns madnet.range
-  (:refer-clojure :exclude [take drop sequence take-last drop-last read range proxy])
+  (:refer-clojure :exclude [take drop sequence take-last drop-last range proxy])
   (:import [madnet.range Range ProxyRange ObjectRange]))
 
 ;;
@@ -64,28 +64,4 @@
 (defn split [n range]
   (let [clone (.clone range)]
     [(split! n clone) clone]))
-
-;;
-;; Reading/writing
-;;
-
-(defn write! [dest src]
-  (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.)))
-  dest)
-
-(defn read! [dest src]
-  (or (.read dest src) (.write src dest) (throw (UnsupportedOperationException.)))
-  dest)
-
-(defn write [dest src]
-  (let [writen (.clone dest)
-        read (.clone src)]
-    (write! writen read)
-    [writen read]))
-
-(defn read [dest src]
-  (let [read (.clone dest)
-        writen (.clone src)]
-    (read! read writen)
-    [read writen]))
 

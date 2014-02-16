@@ -1,15 +1,17 @@
 (ns madnet.range-test
-  (:require [khazad-dum.core :refer :all]
+  (:require [khazad-dum :refer :all]
+            [madnet.channel :as c] 
             [madnet.range :as r])
   (:import [madnet.range Range IntegerRange CircularRange
-                         ProxyRange LinkedRange ObjectRange]))
+                         ProxyRange LinkedRange ObjectRange]
+           [madnet.channel Result]))
 
 (defmacro ?range= [expr [begin end]]
   `(let [range# ~expr]
      (?= (.begin range#) ~begin)
      (?= (.end range#) ~end)))
 
-(defn- irange [min max]
+(defn irange [min max]
   (IntegerRange. min max))
 
 (deftest making-range
@@ -19,9 +21,9 @@
   (?= (r/size (irange 5 10)) 5))
 
 (deftest range-read-and-write
-  (?throws (r/read! (irange 0 1) (irange 5 10))
+  (?throws (c/read! (irange 0 1) (irange 5 10))
            UnsupportedOperationException)
-  (?throws (r/write! (irange 2 10) (irange 5 10))
+  (?throws (c/write! (irange 2 10) (irange 5 10))
            UnsupportedOperationException))
 
 (deftest range-mutable-take-drop-and-expand
@@ -116,62 +118,7 @@
     (?range= (.dropFirst cr2) [0 3])
     (?range= (.first cr2) [0 3])))
 
-(deftest range-proxy-making
-  (let [r (irange 0 10)
-        p (r/proxy r)]
-    (?= (r/size p) 10)
-    (?range= (.range p) [0 10])))
-    
-(deftest range-proxy-cloning
-  (let [r (irange 0 10)
-        pr (r/proxy r)
-        prc (.clone pr)]
-    (?range= (.range prc) [0 10])
-    (r/drop! 5 r)
-    (?range= (.range prc) [0 10])))
-
-(deftest range-proxy-operations
-  (let [pr (r/proxy (irange 0 10))]
-    (?= (r/size (r/drop! 3 pr)) 7)
-    (?range= (.range pr) [3 10])
-    (?= (r/size (r/take! 5 pr)) 5)
-    (?range= (.range pr) [3 8])
-    (?= (r/size (r/expand! 3 pr)) 8)
-    (?range= (.range pr) [3 11])
-    (?= (r/size (r/take-last! 4 pr)) 4)
-    (?range= (.range pr) [7 11])
-    (?= (r/size (r/drop-last! 1 pr)) 3)
-    (?range= (.range pr) [7 10])))
-
-(deftest range-proxy-read-and-write
-  (let [r (proxy [IntegerRange] [0 10]
-            (write [seq] (throw (UnsupportedOperationException.
-                                 "Writing to proxies is OK")))
-            (read [seq] (throw (UnsupportedOperationException.
-                                "Reading from proxies is OK"))))
-        pr (r/proxy r)]
-    (?throws (r/write! pr nil) UnsupportedOperationException
-             "Writing to proxies is OK")
-    (?throws (r/read! pr nil) UnsupportedOperationException
-             "Reading from proxies is OK")))
-
-(deftest read-only-and-write-only-proxies
-  (let [r (proxy [IntegerRange] [0 10]
-            (write [seq] this)
-            (read [seq] this))
-        rp (r/proxy r :read-only)
-        wp (r/proxy r :write-only)]
-    (?= (r/read! rp nil) rp)
-    (?throws (r/read! wp nil) UnsupportedOperationException)
-    (?= (r/write! wp nil) wp)
-    (?throws (r/write! rp nil) UnsupportedOperationException)))
-
-(deftest extending-range-proxy
-  (let [r (irange 0 10)
-        p (r/proxy r (expand [n] this))]
-    (?range= (.range (r/expand 1000 p)) [0 10])))
-
-(defn- srange [begin end coll]
+(defn srange [begin end coll]
   (let [coll (atom coll)
         writer (fn [dst src]
                  (if (isa? (type src) clojure.lang.Seqable)
@@ -182,23 +129,22 @@
                                                    write-size) @coll)))
                      (r/drop! write-size src)
                      (r/drop! write-size dst)
-                     dst)))]
+                     (Result. write-size write-size))))]
     (proxy [IntegerRange clojure.lang.Seqable clojure.lang.Counted]
            [begin end]
       (seq [] (seq (->> @coll (take (.end this)) (drop (.begin this)))))
       (count [] (r/size this))
       (write [src] (writer this src))
       (read [ts] nil)
-      (iterator [] (.iterator @coll)))))
+      (iterator [] (.iterator (seq this))))))
 
 (defn- another-range [begin end coll]
   (let [range (srange begin end coll)]
     (r/proxy range
       (write [ts] nil)
       (read [ts]
-         (if (isa? (type ts) ProxyRange)
-           (do (r/read! range (.range ts)) this)
-           (do (r/read! range ts) this))))))
+         (let [writer (if (isa? (type ts) ProxyRange) (.range ts) ts)]
+           (or (.read range writer) (.write writer range)))))))
 
 (deftest simple-seq-based-range
   (let [r (srange 2 5 (range 10))]
@@ -206,35 +152,38 @@
     (?= (seq r) [2 3 4])
     (let [r2 (srange 0 4 (repeat 10 nil))
           cr2 (.clone r2)]
-      (?range= (r/read! r r2) [5 5])
+      (?= (c/read! r r2) (Result. 3 3))
+      (?range= r [5 5])
       (?range= r2 [3 4])
       (?= (seq r2) [nil])
-      (?= (seq cr2) [2 3 4 nil]))))
+      (?= (seq cr2) [2 3 4 nil]))
+    (?= (c/read! (srange 0 5 (range 5)) (srange 0 4 (repeat 4 nil)))
+        (Result. 4 4))))
 
 (deftest writing-without-write-impl
   (let [r1 (another-range 1 6 (repeat 6 nil))
         rc (.clone r1)
         r2 (another-range 0 5 [1 2 3 4 5])]
-    (?= (r/write! r1 r2) r1)
+    (?= (c/write! r1 r2) (Result. 5 5))
     (?= (seq (.range rc)) [1 2 3 4 5])))
 
 (deftest reading-and-writing-to-unknown-type
   (let [r1 (srange 0 10 (repeat 10 nil))
         r2 (irange 0 10)]
-    (?throws (r/write! r2 r1) UnsupportedOperationException)
-    (?throws (r/write! r1 r2) UnsupportedOperationException)
-    (?throws (r/read! r1 r2) UnsupportedOperationException)
-    (?throws (r/read! r2 r1) UnsupportedOperationException)))
+    (?throws (c/write! r2 r1) UnsupportedOperationException)
+    (?throws (c/write! r1 r2) UnsupportedOperationException)
+    (?throws (c/read! r1 r2) UnsupportedOperationException)
+    (?throws (c/read! r2 r1) UnsupportedOperationException)))
 
 (deftest immutable-write-and-read
   (let [r1 (srange 0 5 (repeat 5 nil))
         r2 (srange 0 3 [1 2 3])]
-    (let [[writen read] (r/write r1 r2)]
+    (let [[writen read] (c/write r1 r2)]
       (?range= writen [3 5])
       (?range= read [3 3]))
     (?= (seq r1) [1 2 3 nil nil])
     (?= (seq r2) [1 2 3])
-    (let [[read writen] (r/read (r/drop! 2 r1) r2)]
+    (let [[read writen] (c/read (r/drop! 2 r1) r2)]
       (?range= read [5 5])
       (?range= writen [3 3])
       (?= (seq r1) [3 nil nil])
@@ -254,114 +203,20 @@
   (let [r1 (circular srange 3 1 (repeat 5 nil))
         rc (.clone r1)
         r2 (circular srange 2 1 [1 2 3 4])]
-    (?range= (r/write! r1 r2) [1 1])
-    (?= (seq rc) [3 4 1])
-    (?range= r2 [1 1]))
+    (?= (c/write! r1 r2) (Result. 3 3))
+    (?range= r1 [1 1])
+    (?range= r2 [1 1])
+    (?= (seq rc) [3 4 1]))
   (let [r1 (circular another-range 3 1 (repeat 5 nil))
         rc (.clone r1)
         r2 (circular another-range 4 2 (range 6))]
-    (r/write! r1 r2)
-    (?range= (.first r1) [1 1])
-    (?range= (.first r2) [1 2])
-    (?= (seq (.range (.first rc))) [4 5])
-    (?= (seq (.range (.first (.dropFirst rc)))) [0])))
+    (?= (c/write! r1 r2) (Result. 3 3))
+    (?range= r1 [1 1])
+    (?range= r2 [1 2])
+    (?= (seq rc) [4 5 0])))
 
 (deftest circular-range-iterator
   (?= (seq (circular srange 3 1 (range 5))) [3 4 0]))
-
-(defn- link! [range prev next]
-  (LinkedRange. range prev next))
-
-(deftest make-linked-range
-  (let [r1 (irange 0 10)
-        r2 (irange 10 15)
-        r3 (irange -7 0)
-        l1 (link! r1 r3 r2)
-        l2 (link! r2 r1 nil)
-        l3 (link! r3 nil r1)]
-    (?= (r/size l1) 10)
-    (?= (r/size l2) 5)
-    (?= (r/size l3) 7)
-    (?true (isa? (type l1) ProxyRange))))
-
-(deftest linked-range-cloning
-  (let [r1 (irange 0 10)
-        r2 (irange 10 15)
-        r3 (irange 10 15)
-        lr (link! r1 r3 r2)
-        lc (.clone lr)]
-    (r/drop! 5 r1)
-    (?range= (.range lc) [0 10])
-    (r/drop! 5 r2)
-    (?range= (.next lc) [15 15])
-    (r/drop! 3 r3)
-    (?range= (.prev lc) [13 15])))
-
-(deftest linked-range-operations
-  (let [r1 (irange 0 10)
-        r2 (irange 10 20)
-        r3 (irange -10 0)
-        lr (link! r1 r3 r2)]
-    (r/drop! 3 lr)
-    (?range= r3 [-10 3])
-    (r/expand! 7 lr)
-    (?range= r2 [17 20])))
-
-(defn object-range [begin end content]
-  (ObjectRange. begin end (java.util.ArrayList. content)))
-
-(deftest making-object-range
-  (let [r (object-range 3 15 (repeat 15 nil))]
-    (?range= r [3 15]))
-  (let [r (object-range 2 12 (range 15))]
-    (?= (seq r) (seq (range 2 12)))
-    (?range= r [2 12])))
-
-(deftest overexpanding-object-range
-  (let [r (object-range 0 10 (repeat 10 nil))]
-    (?throws (r/expand! 1 r) IllegalArgumentException))
-  (?throws (object-range 0 10 (repeat 5 nil)) IllegalArgumentException)
-  (?throws (object-range -1 10 (repeat 10 nil)) IllegalArgumentException))
-
-(deftest cloning-object-range
-  (let [r (object-range 0 10 (range 10))
-        rc (.clone r)]
-    (r/take! 5 r)
-    (?= (seq rc) (seq (range 10)))))
-
-(deftest writing-to-object-range
-  (let [src (object-range 0 10 (range 10))
-        dst (object-range 0 5 (repeat 5 nil))
-        dst-clone (.clone dst)]
-    (r/write! dst src)
-    (?range= dst [5 5])
-    (?range= src [5 10])
-    (?= (seq dst-clone) (seq (range 5))))
-  (let [src (object-range 0 5 (range 5))
-        dst (object-range 0 10 (repeat 10 nil))
-        dst-clone (.clone dst)]
-    (r/write! dst src)
-    (?range= dst [5 10])
-    (?range= src [5 5])
-    (?= (seq dst-clone) (seq (concat (range 5) (repeat 5 nil))))))
-
-(deftest accessing-object-range
-  (let [r (object-range 2 8 (range 10))]
-    (?= (.get r 2) 4)
-    (.set r 5 -100)
-    (?= (.get r 5) -100)
-    (?throws (.get r -1) IllegalArgumentException)
-    (?throws (.set r -1 100500) IllegalArgumentException)
-    (?throws (.get r 7) IllegalArgumentException)
-    (?throws (.set r 7 100500) IllegalArgumentException)))
-
-(deftest reading-anything-iterable-to-object-range
-  (let [r (object-range 0 10 (repeat 10 nil))
-        rc (.clone r)
-        ar (srange 0 5 (range 5))]
-    (?range= (r/write! r ar) [5 10])
-    (?range= ar [5 5])
-    (?= (seq rc) (seq (concat (range 5) (repeat 5 nil))))))
 
 ;;push and pop for ranges (queue)
 
@@ -370,5 +225,5 @@
 ;;cloning sequence
 ;;accessing sequence
 ;;reading/writing sequence
-;;sequence reader/writer access
+;;sequence reade/writer access
 ;;push and pop for sequences (queue)

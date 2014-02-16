@@ -1,6 +1,7 @@
 package madnet.range;
 
 import java.util.Iterator;
+import madnet.channel.Result;
 import madnet.channel.IChannel;
 
 public class CircularRange extends Range
@@ -125,28 +126,42 @@ public class CircularRange extends Range
     }
 
     @Override
-    public CircularRange write(IChannel ch) throws Exception {
-        if(this.range.write(ch) == null && ch.read(this.range) == null)
-            return null;
+    public Result write(IChannel ch) throws Exception {
+        Result writeResult = range.write(ch);
 
-        if(this.range.size() > 0 || size() == 0)
-            return this;
+        if(writeResult == null) {
+            writeResult = ch.read(this.range);
 
-        begin(this.range.begin());
+            if(writeResult == null)
+                return null;
+        }
 
-        return write(ch);
+        if(range.size() > 0 || size() == 0) {
+            begin(range.begin());
+            return writeResult;
+        }
+
+        begin(range.begin());
+        return writeResult.add(write(ch));
     }
 
     @Override
-    public CircularRange read(IChannel ch) throws Exception {
-        if(this.range.read(ch) == null && ch.write(this.range) == null)
-            return null;
+    public Result read(IChannel ch) throws Exception {
+        Result readResult = range.read(ch);
 
-        if(this.range.size() > 0 || size() == 0)
-            return this;
+        if(readResult == null) {
+            readResult = ch.write(this.range);
 
-        begin(this.range.begin());
+            if(readResult == null)
+                return null;
+        }
 
-        return read(ch); 
+        if(size() == 0 || range.size() > 0) {
+            begin(range.begin());
+            return readResult;
+        }
+
+        begin(range.begin());
+        return readResult.add(read(ch));
     }
 }

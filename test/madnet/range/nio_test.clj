@@ -1,6 +1,7 @@
 (ns madnet.range.nio-test
-  (:require [khazad-dum.core :refer :all]
+  (:require [khazad-dum :refer :all]
             [madnet.range-test :refer :all]
+            [madnet.channel :as c]
             [madnet.range :as r]
             [madnet.range.nio :as n])
   (:import [java.nio ByteBuffer CharBuffer]
@@ -83,8 +84,8 @@
               (?range= r1 [10 10])
               (?range= r2 [10 10])
               (?= (seq rc) [1 2 5 10 17 26 37 50 65 82])))]
-    (operation-check r/write!)
-    (operation-check #(r/read! %2 %1))))
+    (operation-check c/write!)
+    (operation-check #(c/read! %2 %1))))
 
 (deftest writing-more-and-less-to-byte-buffer
   (let [b (ByteBuffer/allocate 10)
@@ -93,7 +94,7 @@
         dest-clone (.clone dest)]
     (dotimes [i 10]
       (.put b i (+ i 3)))
-    (r/write! dest source)
+    (c/write! dest source)
     (?range= source [5 10])
     (?range= dest [5 5])
     (?= (seq dest-clone) [3 4 5 6 7]))
@@ -103,10 +104,14 @@
         dest-clone (.clone dest)]
     (dotimes [i 5]
       (.put b i (+ i 2)))
-    (r/write! dest source)
+    (c/write! dest source)
     (?range= source [5 5])
     (?range= dest [5 10])
     (?= (seq (r/take 5 dest-clone)) [2 3 4 5 6])))
+
+;;
+;; Char Range
+;;
 
 (defn- char-range [begin end buffer]
   (CharRange. begin end buffer))
@@ -134,7 +139,7 @@
             (char-range begin end (CharBuffer/wrap (char-array chars))))
           (?write= [dst src str]
             (let [clone (.clone dst)]
-              (r/write! dst src)
+              (c/write! dst src)
               (?= (seq clone) (seq str))))]
     (let [src (char-range- 0 5 "Hello")
           dst (char-range- 0 5 5)]

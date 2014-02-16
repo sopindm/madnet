@@ -1,6 +1,7 @@
 package madnet.range;
 
 import madnet.channel.IChannel;
+import madnet.channel.Result;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -62,11 +63,11 @@ public class ObjectRange extends IntegerRange {
     }
 
     @Override
-    public ObjectRange write(IChannel channel) throws Exception {
-        if(!(channel instanceof IRange))
+    public Result write(IChannel channel) throws Exception {
+        if(!(channel instanceof Range))
             return null;
         
-        IRange r = (IRange)channel;
+        Range r = (Range)channel;
 
         int writen = 0;
         Iterator reader = r.iterator();
@@ -79,6 +80,6 @@ public class ObjectRange extends IntegerRange {
         drop(writen);
         r.drop(writen);
 
-        return this;
+        return new Result(writen, writen);
     }
 }
