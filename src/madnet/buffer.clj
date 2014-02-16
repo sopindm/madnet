@@ -1,4 +1,5 @@
 (ns madnet.buffer
+  (:require [madnet.range :as r])
   (:import [madnet.range ObjectRange]
            [java.nio ByteBuffer CharBuffer]))
 
@@ -48,10 +49,12 @@
 
 (defn- circular-generator [generator size]
   (assoc generator 
-    :range (fn [buffer begin end]
-             (madnet.range.CircularRange.
-              ((:range generator) buffer begin end)
-              (madnet.range.IntegerRange. 0 size)))))
+    :range (fn make [buffer begin end]
+             (if (<= begin end)
+               (madnet.range.CircularRange.
+                ((:range generator) buffer begin end)
+                (madnet.range.IntegerRange. 0 size))
+               (r/drop! 0 (r/expand! end (make buffer begin size)))))))
 
 (defn- primitive-generator [options]
   (let [element (get options :element :object)

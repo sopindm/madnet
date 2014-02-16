@@ -8,7 +8,6 @@ public class ProxyRange extends Range
     private Range range;
 
     public ProxyRange(Range range) {
-        super(range.begin(), range.end());
         this.range = range;
     }
 

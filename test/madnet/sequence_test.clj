@@ -4,7 +4,8 @@
             [madnet.buffer :as b]
             [madnet.sequence :as s]
             [madnet.range-test :refer :all])
-  (:import [madnet.range IntegerRange ObjectRange]))
+  (:import [madnet.range IntegerRange ObjectRange]
+           [madnet.channel Result]))
 
 (deftest making-sequence
   (let [s (s/sequence 100)]
@@ -48,7 +49,8 @@
   (let [s (s/sequence (b/wrap (range -5 5)) :reader [0 10])
         r ((b/buffer 10))
         rc (.clone r)]
-    (?range= (.reader (c/read! s r)) [10 10])
+    (?= (c/read! s r) (Result. 10 10))
+    (?range= (.reader s) [10 10])
     (?range= r [10 10])
     (?range= (s/reader s) [10 10])
     (?range= (s/writer s) [10 10])
@@ -61,7 +63,7 @@
         rc (.clone r)]
     (c/write! s r)
     (?range= (s/reader s) [0 10])
-    (?range= (s/writer s) [10 10])
+    (?range= (s/writer s) [0 0])
     (?range= r [10 10])
     (?= (seq s) (seq (map byte (range 10)))))) 
 

@@ -13,10 +13,10 @@
   madnet.channel.IChannel
   (write [this channel]
     (let [writer (.writer this)]
-      (if (or (.write writer channel) (.read channel writer)) this)))
+      (or (.write writer channel) (.read channel writer))))
   (read [this channel]
     (let [reader (.reader this)]
-      (if (or (.read reader channel) (.write channel reader)) this))))
+      (or (.read reader channel) (.write channel reader)))))
 
 (defn- buffer- [buffer-or-spec]
   (let [size (if (sequential? buffer-or-spec)
@@ -29,11 +29,13 @@
 
 (defn ranges [buffer reader-option writer-option]
   (letfn [(buffer- [begin end] (buffer begin end))
-          (before-range [[begin end] buffer] [0 begin])
-          (after-range [[begin end] buffer] [end (count buffer)])]
-    (let [reader (or reader-option [0 0])
-          writer (or writer-option (after-range reader buffer))
-          reader (or reader-option (before-range writer buffer))]
+          (before-range [[begin end] buffer]
+            (if (b/circular? buffer) [end begin] [0 begin]))
+          (after-range [[begin end] buffer]
+            (if (b/circular? buffer) [end begin] [end (count buffer)]))]
+    (let [writer (or writer-option [0 (count buffer)])
+          reader (or reader-option (before-range writer buffer))
+          writer (or writer-option (after-range reader buffer))]
       [(apply buffer- reader) (apply buffer- writer)])))
 
 (defn sequence [buffer-or-spec & {:as options}]

@@ -6,6 +6,9 @@ import madnet.channel.Result;
 abstract public class Range extends madnet.channel.Channel
     implements Iterable, Cloneable
 {
+    protected Range() {
+    }
+
     public Range(int begin, int end) {
         if(begin > end)
             throw new IllegalArgumentException();
