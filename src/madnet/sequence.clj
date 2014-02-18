@@ -1,11 +1,15 @@
 (ns madnet.sequence
+  (:refer-clojure :exclude [sequence])
   (:require [madnet.channel :as c]
             [madnet.range :as r]
             [madnet.buffer :as b])
   (:import [madnet.range LinkedRange]))
 
 (declare size)
-(deftype Sequence [buffer reader writer]
+(deftype Sequence [buffer reader writer circular?]
+  Cloneable
+  Object
+  (clone [this] (Sequence. buffer (.clone reader) (.clone writer) circular?))
   clojure.lang.Seqable
   (seq [this] (seq (.reader this)))
   clojure.lang.Counted
@@ -13,10 +17,14 @@
   madnet.channel.IChannel
   (write [this channel]
     (let [writer (.writer this)]
-      (or (.write writer channel) (.read channel writer))))
+      (when-let [result (or (.write writer channel) (.read channel writer))]
+        (.expand (.reader this) (.read result))
+        result)))
   (read [this channel]
     (let [reader (.reader this)]
-      (or (.read reader channel) (.write channel reader)))))
+      (when-let [result (or (.read reader channel) (.write channel reader))]
+        (when circular? (.expand (.writer this) (.writen result)))
+        result))))
 
 (defn- buffer- [buffer-or-spec]
   (let [size (if (sequential? buffer-or-spec)
@@ -28,12 +36,20 @@
                           (get options :circular true)))))
 
 (defn ranges [buffer reader-option writer-option]
-  (letfn [(buffer- [begin end] (buffer begin end))
-          (before-range [[begin end] buffer]
-            (if (b/circular? buffer) [end begin] [0 begin]))
-          (after-range [[begin end] buffer]
-            (if (b/circular? buffer) [end begin] [end (count buffer)]))]
-    (let [writer (or writer-option [0 (count buffer)])
+  (letfn [(parse-option [[begin end]]
+            (if (<= begin end) [begin end 0] [begin (count buffer) end]))
+          (buffer- [begin end tail](r/expand! tail (buffer begin end)))
+          (before-range [[begin end tail] buffer]
+            (if (b/circular? buffer) 
+              (if (zero? tail) [end (count buffer) begin] [tail begin 0])
+              [0 begin 0]))
+          (after-range [[begin end tail] buffer]
+            (if (b/circular? buffer)
+              (before-range [begin end tail] buffer)
+              [end (count buffer) 0]))]
+    (let [reader-option (if reader-option (parse-option reader-option))
+          writer-option (if writer-option (parse-option writer-option))
+          writer (or writer-option [0 (count buffer) 0])
           reader (or reader-option (before-range writer buffer))
           writer (or writer-option (after-range reader buffer))]
       [(apply buffer- reader) (apply buffer- writer)])))
@@ -43,8 +59,11 @@
             buffer-or-spec
             (buffer- buffer-or-spec))
         [reader writer] (ranges b (:reader options) (:writer options))]
-    (Sequence. b (LinkedRange. reader nil writer)
-               (LinkedRange. writer reader nil))))
+    (Sequence. b reader writer (b/circular? b))))
+
+(defn wrap [coll]
+  (let [b (b/wrap coll)]
+    (Sequence. b (b 0 (count b)) (b (count b) (count b)) false)))
 
 (defn reader [seq]
   (.reader seq))
@@ -59,4 +78,4 @@
   (r/size (.writer seq)))
 
 (defn circular? [seq]
-  (b/circular? (.buffer seq)))
+  (.circular? seq))

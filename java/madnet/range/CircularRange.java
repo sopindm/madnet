@@ -16,6 +16,8 @@ public class CircularRange extends Range
         this.tail = 0;
         this.limit = limit;
 
+        begin(range.begin());
+
         if(range.begin() < limit.begin() || range.end() > limit.end())
             throw new IllegalArgumentException();
     }
@@ -50,7 +52,7 @@ public class CircularRange extends Range
     protected CircularRange begin(int n) {
         if(n >= limit.end()) {
             range.begin(limit.begin() + n - limit.end());
-            range.end(tail);
+            range.end(limit.begin() + tail);
 
             tail = 0;
         }
@@ -71,8 +73,10 @@ public class CircularRange extends Range
             range.end(limit.end());
             tail = n - limit.end();
         }
-        else
+        else {
             range.end(n);
+            tail = 0;
+        }
 
         return this;
     }
@@ -80,6 +84,19 @@ public class CircularRange extends Range
     @Override
     public int size() {
         return range.size() + tail;
+    }
+
+    @Override
+    public CircularRange expand(int n) {
+        if(size() + n > limit.size())
+            throw new IndexOutOfBoundsException();
+
+        if(tail == 0)
+            end(end() + n);
+        else
+            tail += n;
+
+        return this;
     }
 
     @Override

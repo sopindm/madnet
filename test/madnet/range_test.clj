@@ -97,15 +97,17 @@
 (deftest circular-range-operations
   (let [cr (crange 0 0 (irange -5 5))]
     (?range= (r/expand! 7 cr) [0 -3])
-    (comment
     (?range= (r/take 6 cr) [0 -4])
     (?range= (r/drop 6 cr) [-4 -3])
     (?range= (r/take-last 1 cr) [-4 -3])
-    (?range= (r/drop-last 2 cr) [0 -5])
+    (?range= (r/drop-last 2 cr) [0 5])
+    (?range= (r/expand 3 cr) [0 0])
+    (?= (r/size (r/expand 3 cr)) 10)
+    (?throws (r/expand 4 cr) IndexOutOfBoundsException)
     (?throws (r/take 100 cr) IndexOutOfBoundsException)
     (?throws (r/take-last 100 cr) IndexOutOfBoundsException)
     (?throws (r/drop 100 cr) IndexOutOfBoundsException)
-    (?throws (r/drop-last 100 cr) IndexOutOfBoundsException))))
+    (?throws (r/drop-last 100 cr) IndexOutOfBoundsException)))
 
 (deftest circular-range-first-and-rest
   (let [cr1 (crange 0 10 (irange -5 15))]
@@ -218,12 +220,3 @@
 (deftest circular-range-iterator
   (?= (seq (circular srange 3 1 (range 5))) [3 4 0]))
 
-;;push and pop for ranges (queue)
-
-;sequence
-;;making sequence
-;;cloning sequence
-;;accessing sequence
-;;reading/writing sequence
-;;sequence reade/writer access
-;;push and pop for sequences (queue)

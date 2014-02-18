@@ -49,12 +49,10 @@
 
 (defn- circular-generator [generator size]
   (assoc generator 
-    :range (fn make [buffer begin end]
-             (if (<= begin end)
-               (madnet.range.CircularRange.
-                ((:range generator) buffer begin end)
-                (madnet.range.IntegerRange. 0 size))
-               (r/drop! 0 (r/expand! end (make buffer begin size)))))))
+    :range (fn [buffer begin end]
+             (madnet.range.CircularRange.
+              ((:range generator) buffer begin end)
+              (madnet.range.IntegerRange. 0 size)))))
 
 (defn- primitive-generator [options]
   (let [element (get options :element :object)
@@ -75,8 +73,7 @@
   ([size options]
      (let [generator (generator size options)
            coll ((:buffer generator) size)
-           range-generator (:range generator)]
-       (Buffer. (fn [begin end] (range-generator coll begin end))
+           range-generator (:range generator)]       (Buffer. (fn [begin end] (range-generator coll begin end))
                 (get options :element :object) size))))
 
 (defn- element-type [coll]

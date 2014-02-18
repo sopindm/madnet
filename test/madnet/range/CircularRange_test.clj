@@ -4,5 +4,5 @@
             [madnet.range :as r])
   (:import [madnet.range Range IntegerRange CircularRange
                          ProxyRange LinkedRange ObjectRange]
-           [madnet.channel Channel]))
+           [madnet.channel]))
 

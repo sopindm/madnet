@@ -3,8 +3,7 @@ package madnet.range;
 import madnet.channel.IChannel;
 import madnet.channel.Result;
 
-abstract public class Range extends madnet.channel.Channel
-    implements Iterable, Cloneable
+abstract public class Range implements IChannel, Iterable
 {
     protected Range() {
     }
