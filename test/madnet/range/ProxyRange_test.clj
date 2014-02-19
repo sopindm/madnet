@@ -35,11 +35,11 @@
 
 (deftest range-proxy-read-and-write
   (let [writeable (proxy [IntegerRange] [0 10]
-                    (write [seq] (throw (UnsupportedOperationException.
-                                         "Writing to proxies is OK"))))
+                    (writeImpl [seq] (throw (UnsupportedOperationException.
+                                             "Writing to proxies is OK"))))
         readable (proxy [IntegerRange] [0 10]
-                   (read [seq] (throw (UnsupportedOperationException.
-                                       "Reading from proxies is OK"))))
+                   (readImpl [seq] (throw (UnsupportedOperationException.
+                                           "Reading from proxies is OK"))))
         wp (r/proxy writeable)
         rp (r/proxy readable)
         range (IntegerRange. 0 10)]
@@ -47,21 +47,21 @@
              "Writing to proxies is OK")
     (?throws (.write rp readable) UnsupportedOperationException
              "Reading from proxies is OK")
-    (?throws (.read rp nil) UnsupportedOperationException
+    (?throws (.read rp readable) UnsupportedOperationException
              "Reading from proxies is OK")
     (?throws (.read wp writeable) UnsupportedOperationException
              "Writing to proxies is OK")))
 
 (deftest read-only-and-write-only-proxies
   (let [r (proxy [IntegerRange] [0 10]
-            (write [seq] (Result. 0 0))
-            (read [seq] (Result. 0 0)))
+            (writeImpl [seq] (Result. 0 0))
+            (readImpl [seq] (Result. 1 1)))
         rp (r/proxy r :read-only)
         wp (r/proxy r :write-only)]
-    (?= (c/read! rp nil) (Result. 0 0))
-    (?throws (c/read! wp nil) UnsupportedOperationException)
-    (?= (c/write! wp nil) (Result. 0 0))
-    (?throws (c/write! rp nil) UnsupportedOperationException)))
+    (?= (c/read! rp wp) (Result. 1 1))
+    (?throws (c/read! wp rp) UnsupportedOperationException)
+    (?= (c/write! wp rp) (Result. 0 0))
+    (?throws (c/write! rp wp) UnsupportedOperationException)))
 
 (deftest extending-range-proxy
   (let [r (irange 0 10)

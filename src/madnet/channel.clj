@@ -6,6 +6,12 @@
 ;; Reading/writing
 ;;
 
+(defn readable? [ch]
+  (.readable ch))
+
+(defn writeable? [ch]
+  (.writeable ch))
+
 (defn write! [dest src]
   (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.))))
 
@@ -31,6 +37,10 @@
 (deftype Pipe [pipe]
   IChannel
   (clone [this] this)
+  (readable [this] (-> pipe .source .isOpen))
+  (closeRead [this] (-> pipe .source .close))
+  (writeable [this] (-> pipe .sink .isOpen))
+  (closeWrite [this] (-> pipe .sink .close))
   (write [this channel]
     (when (instance? madnet.range.nio.ByteRange channel)
       (let [buffer (.buffer channel)
@@ -52,4 +62,9 @@
     (.configureBlocking (.source pipe) false)
     (Pipe. pipe)))
 
-  
+(defn close! [channel & options]
+  (when (or (some #{:write} options) (empty? options))
+    (.closeWrite channel))
+  (when (or (some #{:read} options) (empty? options))
+    (.closeRead channel))
+  channel)

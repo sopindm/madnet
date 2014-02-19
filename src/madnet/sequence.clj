@@ -2,8 +2,7 @@
   (:refer-clojure :exclude [sequence])
   (:require [madnet.channel :as c]
             [madnet.range :as r]
-            [madnet.buffer :as b])
-  (:import [madnet.range LinkedRange]))
+            [madnet.buffer :as b]))
 
 (declare size)
 (deftype Sequence [buffer reader writer circular?]
@@ -15,6 +14,10 @@
   clojure.lang.Counted
   (count [this] (size this))
   madnet.channel.IChannel
+  (readable [this] (.readable reader))
+  (closeRead [this] (.closeRead reader))
+  (writeable [this] (.writeable writer))
+  (closeWrite [this] (.closeWrite writer))
   (write [this channel]
     (let [writer (.writer this)]
       (when-let [result (or (.write writer channel) (.read channel writer))]

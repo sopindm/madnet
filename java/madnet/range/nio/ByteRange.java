@@ -50,7 +50,7 @@ public class ByteRange extends Range {
     }
 
     @Override
-    public Result write(IChannel ch) throws Exception {
+    protected Result writeImpl(IChannel ch) throws Exception {
         if(!(ch instanceof ByteRange))
             return null;
 

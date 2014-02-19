@@ -63,7 +63,7 @@ public class ObjectRange extends IntegerRange {
     }
 
     @Override
-    public Result write(IChannel channel) throws Exception {
+    protected Result writeImpl(IChannel channel) throws Exception {
         if(!(channel instanceof Range))
             return null;
         

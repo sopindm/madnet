@@ -22,6 +22,26 @@ public class CircularRange extends Range
             throw new IllegalArgumentException();
     }
 
+    @Override
+    public boolean readable() {
+        return range.readable();
+    }
+
+    @Override
+    public void closeRead() {
+        range.closeRead();
+    }
+
+    @Override 
+    public boolean writeable() {
+        return range.writeable();
+    }
+
+    @Override
+    public void closeWrite() {
+        range.closeWrite();
+    }
+
     public Range first() {
         return range;
     }
@@ -143,7 +163,7 @@ public class CircularRange extends Range
     }
 
     @Override
-    public Result write(IChannel ch) throws Exception {
+    protected Result writeImpl(IChannel ch) throws Exception {
         Result writeResult = range.write(ch);
 
         if(writeResult == null) {
@@ -163,7 +183,7 @@ public class CircularRange extends Range
     }
 
     @Override
-    public Result read(IChannel ch) throws Exception {
+    protected Result readImpl(IChannel ch) throws Exception {
         Result readResult = range.read(ch);
 
         if(readResult == null) {

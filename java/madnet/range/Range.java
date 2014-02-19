@@ -59,14 +59,28 @@ abstract public class Range implements IChannel, Iterable
         return end(end() + n);
     }
 
-    @Override
-    public Result read(IChannel range) throws Exception {
+    protected Result writeImpl(IChannel ch) throws Exception {
+        return null;
+    }
+
+    protected Result readImpl(IChannel ch) throws Exception {
         return null;
     }
 
     @Override
-    public Result write(IChannel range) throws Exception {
-        return null;
+    public final Result write(IChannel ch) throws Exception {
+        if(!writeable() || !ch.readable())
+            throw new java.nio.channels.ClosedChannelException();
+
+        return writeImpl(ch);
+    }
+
+    @Override
+    public final Result read(IChannel ch) throws Exception {
+        if(!readable() || !ch.writeable())
+            throw new java.nio.channels.ClosedChannelException();
+
+        return readImpl(ch);
     }
 
     @Override

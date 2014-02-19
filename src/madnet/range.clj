@@ -8,8 +8,8 @@
 
 (defn- proxy-method- [option]
   (case option
-    :read-only '(write [_] (throw (UnsupportedOperationException.)))
-    :write-only '(read [_] (throw (UnsupportedOperationException.)))
+    :read-only '(writeImpl [_] nil)
+    :write-only '(readImpl [_] nil)
     option))
 
 (defmacro proxy [range & options-and-methods]

@@ -30,14 +30,22 @@
     (if (await-for 1000 writer) (?true (> (count s) 0))
         (throw (RuntimeException. "Agent timeout")))))
 
-;pipe write and read result
+(deftest closing-pipe
+  (let [p (c/pipe)
+        s (s/wrap (byte-array (map byte (range 10))))
+        d (s/sequence [10 :element :byte])]
+    (c/write p s)
+    (c/close! p :write)
+    (?throws (c/write p s) java.nio.channels.ClosedChannelException)
+    (c/read p d)
+    (c/close! p :read)
+    (?throws (c/read p d) java.nio.channels.ClosedChannelException)))
 
+;closing reader and writer
 ;closing pipe
-;writing to closed pipe
 
-;overwriting pipe
-;overreading pipe
-(java.nio.channels.Pipe/open)
+;reading/writing to closed pipe
 
+;selectors for pipes
  
 

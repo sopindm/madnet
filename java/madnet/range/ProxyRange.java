@@ -11,6 +11,26 @@ public class ProxyRange extends Range
         this.range = range;
     }
 
+    @Override 
+    public boolean readable() {
+        return range.readable();
+    }
+
+    @Override
+    public void closeRead() {
+        range.closeRead();
+    }
+
+    @Override 
+    public boolean writeable() {
+        return range.writeable();
+    }
+
+    @Override
+    public void closeWrite() {
+        range.closeWrite();
+    }
+
     @Override
     public int begin() {
         return range.begin();
@@ -86,7 +106,7 @@ public class ProxyRange extends Range
     }        
 
     @Override
-    public Result write(madnet.channel.IChannel ch) throws Exception {
+    protected Result writeImpl(madnet.channel.IChannel ch) throws Exception {
         Result writeResult = range.write(ch);
         if(writeResult != null)
             return writeResult;
@@ -95,7 +115,7 @@ public class ProxyRange extends Range
     }
 
     @Override
-    public Result read(madnet.channel.IChannel ch) throws Exception {
+    protected Result readImpl(madnet.channel.IChannel ch) throws Exception {
         Result readResult = range.read(ch);
         if(readResult != null)
             return readResult;
