@@ -39,16 +39,12 @@
     (?throws (r/drop! 16 r) IndexOutOfBoundsException)))
 
 (deftest closing-nio-range
-  (let [r1 (nrange 0 10 (ByteBuffer/allocate 10))
-        r2 (.clone r1)]
-    (c/close! r1 :read)
-    (?false (c/readable? r1))
-    (?true (c/writeable? r1))
-    (c/close! r1 :write)
-    (?false (c/writeable? r1))
-    (c/close! r2)
-    (?false (c/writeable? r2))
-    (?false (c/readable? r2))))
+  (let [r (nrange 0 10 (ByteBuffer/allocate 10))]
+    (c/close! r :read)
+    (?false (c/readable? r))
+    (?true (c/writeable? r))
+    (c/close! r :write)
+    (?false (c/writeable? r))))
 
 ;;
 ;; byte range

@@ -20,6 +20,22 @@
     (r/drop! 5 r)
     (?range= (.range prc) [0 10])))
 
+(deftest closing-range-proxy
+  (let [r (irange 0 10)
+        pr (r/proxy r)]
+    (?true (c/readable? pr))
+    (?true (c/writeable? pr))
+    (c/close! r)
+    (?false (c/readable? pr))
+    (?false (c/writeable? pr)))
+  (let [r (irange 0 10)
+        pr (r/proxy r)]
+    (c/close! pr)
+    (?false (c/readable? r))
+    (?false (c/readable? pr))
+    (?false (c/writeable? r))
+    (?false (c/writeable? pr))))
+
 (deftest range-proxy-operations
   (let [pr (r/proxy (irange 0 10))]
     (?= (r/size (r/drop! 3 pr)) 7)

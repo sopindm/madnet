@@ -19,11 +19,23 @@
   (?throws (irange 6 5) IllegalArgumentException)
   (?= (r/size (irange 5 10)) 5))
 
+(deftest closing-irange
+  (let [r (irange 0 10)]
+    (?true (c/readable? r))
+    (?true (c/writeable? r))
+    (c/close! r)
+    (?false (c/readable? r))
+    (?false (c/writeable? r))))
+
 (deftest range-read-and-write
   (?throws (c/read! (irange 0 1) (irange 5 10))
            UnsupportedOperationException)
   (?throws (c/write! (irange 2 10) (irange 5 10))
-           UnsupportedOperationException))
+           UnsupportedOperationException)
+  (?throws (c/write! (c/close! (irange 0 10) :write) (irange 0 10))
+           java.nio.channels.ClosedChannelException)
+  (?throws (c/read! (c/close! (irange 0 10) :read) (irange 0 10))
+           java.nio.channels.ClosedChannelException))
 
 (deftest range-mutable-take-drop-and-expand
   (let [r (irange 5 10)]

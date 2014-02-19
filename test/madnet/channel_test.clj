@@ -6,6 +6,28 @@
             [khazad-dum :refer :all])
   (:import [madnet.channel Result]))
 
+(deftest closing-channels
+  (letfn [(channel- []
+            (let [readable (atom true)
+                  writeable (atom true)]
+              (reify madnet.channel.IChannel
+                (readable [this] @readable)
+                (closeRead [this] (reset! readable false))
+                (writeable [this] @writeable)
+                (closeWrite [this] (reset! writeable false)))))]
+    (let [c (channel-)]
+      (c/close! c :read)
+      (?false (c/readable? c)) 
+      (?true (c/writeable? c)))
+    (let [c (channel-)]
+      (c/close! c :write)
+      (?true (c/readable? c)) 
+      (?false (c/writeable? c)))
+    (let [c (channel-)]
+      (c/close! c)
+      (?false (c/readable? c)) 
+      (?false (c/writeable? c)))))
+
 (deftest making-pipe
   (let [p (c/pipe)]
     (?= (c/write! p (s/wrap (byte-array (map byte (range 10)))))
@@ -41,10 +63,27 @@
     (c/close! p :read)
     (?throws (c/read p d) java.nio.channels.ClosedChannelException)))
 
-;closing reader and writer
-;closing pipe
+(deftest pipe-reader-and-writer
+  (let [p (c/pipe)
+        r (.reader p)
+        w (.writer p)]
+    (?true (c/readable? r))
+    (?false (c/readable? w))
+    (?false (c/writeable? r))
+    (?true (c/writeable? w))))
 
-;reading/writing to closed pipe
+(deftest pipe-closeable-implementation
+  (let [p (c/pipe)
+        r (.reader p)
+        w (.writer p)]
+    (with-open [reader r])
+    (?false (c/readable? r))
+    (with-open [writer w])
+    (?false (c/writeable? w)))
+  (let [p (c/pipe)]
+    (with-open [pipe p])
+    (?false (c/readable? p))
+    (?false (c/writeable? p))))
 
 ;selectors for pipes
  
