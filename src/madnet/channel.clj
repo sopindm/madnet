@@ -6,32 +6,32 @@
 ;; Reading/writing
 ;;
 
-(defn readable? [ch]
+(defn readable? [^IChannel ch]
   (.readable ch))
 
-(defn writeable? [ch]
+(defn writeable? [^IChannel ch]
   (.writeable ch))
 
-(defn write! [dest src]
+(defn write! [^IChannel dest ^IChannel src]
   (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.))))
 
-(defn read! [dest src]
+(defn read! [^IChannel dest ^IChannel src]
   (or (.read dest src) (.write src dest) (throw (UnsupportedOperationException.))))
 
-(defn write [dest src]
+(defn write [^IChannel dest ^IChannel src]
   (let [writen (.clone dest)
         read (.clone src)]
     (write! writen read)
     [writen read]))
 
-(defn read [dest src]
+(defn read [^IChannel dest ^IChannel src]
   (let [read (.clone dest)
         writen (.clone src)]
     (read! read writen)
     [read writen]))
 
 
-(defn close! [channel & options]
+(defn close! [^IChannel channel & options]
   (when (or (some #{:write} options) (empty? options))
     (.closeWrite channel))
   (when (or (some #{:read} options) (empty? options))
@@ -42,7 +42,7 @@
 ;; Pipes
 ;;
 
-(deftype PipeReader [ch]
+(deftype PipeReader [^java.nio.channels.Channel ch]
   java.io.Closeable
   (close [this] (.close ch))
   IChannel
@@ -90,7 +90,7 @@
   (read [this channel]
     (.read reader channel)))
 
-(defn pipe []
+(defn pipe ^madnet.channel.Pipe []
   (let [pipe (java.nio.channels.Pipe/open)]
     (.configureBlocking (.sink pipe) false)
     (.configureBlocking (.source pipe) false)

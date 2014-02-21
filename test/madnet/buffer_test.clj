@@ -40,7 +40,7 @@
   (?= (direct? (buffer 10)) nil)
   (?false (direct? (buffer 10 {:element :byte})))
   (?true (direct? (buffer 10 {:element :byte :direct true})))
-  (?false (-> ((buffer 10 {:element :byte :circular false}))
+  (?false (-> ^madnet.range.nio.ByteRange ((buffer 10 {:element :byte :circular false}))
               .buffer .isDirect))
   (?throws (buffer 10 {:direct true}) IllegalArgumentException)
   (?throws (buffer 10 {:direct false}) IllegalArgumentException)

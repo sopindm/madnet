@@ -82,7 +82,7 @@
 (deftest extending-range-proxy
   (let [r (irange 0 10)
         p (r/proxy r (expand [n] this))]
-    (?range= (.range (r/expand 1000 p)) [0 10])))
+    (?range= (.range ^madnet.range.ProxyRange (r/expand 1000 p)) [0 10])))
 
 (deftest iterating-proxy-range
   (let [r (srange 0 10 (range 10))

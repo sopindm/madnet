@@ -18,26 +18,26 @@
     `(clojure.core/proxy [ProxyRange] [~range]
        ~@(map proxy-method- options-and-methods))))
 
-(defn size [range]
+(defn size [^Range range]
   (.size range))
 
-(defn take! [n range]
+(defn take! [n ^Range range]
   (.take range n))
 
-(defn take-last! [n range]
+(defn take-last! [n ^Range range]
   (.takeLast range n))
 
-(defn drop! [n range]
+(defn drop! [n ^Range range]
   (.drop range n))
 
-(defn drop-last! [n range]
+(defn drop-last! [n ^Range range]
   (.dropLast range n))
 
-(defn expand! [n range]
+(defn expand! [n ^Range range]
   (.expand range n))
 
 (declare take)
-(defn split! [n range]
+(defn split! [n ^Range range]
   (let [split (take n range)]
     (drop! n range)
     split))
@@ -46,22 +46,22 @@
 ;; Immutable range operations
 ;;
 
-(defn take [n range]
+(defn take [n ^Range range]
   (take! n (.clone range)))
 
-(defn take-last [n range]
+(defn take-last [n ^Range range]
   (take-last! n (.clone range)))
 
-(defn drop [n range]
+(defn drop [n ^Range range]
   (drop! n (.clone range)))
 
-(defn drop-last [n range]
+(defn drop-last [n ^Range range]
   (drop-last! n (.clone range)))
 
-(defn expand [n range]
+(defn expand [n ^Range range]
   (expand! n (.clone range)))
 
-(defn split [n range]
+(defn split [n ^Range range]
   (let [clone (.clone range)]
     [(split! n clone) clone]))
 

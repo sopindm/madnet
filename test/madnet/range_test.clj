@@ -6,11 +6,11 @@
            [madnet.channel Result]))
 
 (defmacro ?range= [expr [begin end]]
-  `(let [range# ~expr]
+  `(let [^Range range# ~expr]
      (?= (.begin range#) ~begin)
      (?= (.end range#) ~end)))
 
-(defn irange [min max]
+(defn irange ^IntegerRange [min max]
   (IntegerRange. min max))
 
 (deftest making-range
@@ -82,9 +82,9 @@
       (?range= rest [8 10])
       (?range= r [5 10]))))
 
-(defn srange [begin end coll]
+(defn srange ^madnet.range.Range [begin end coll]
   (let [coll (atom coll)
-        writer (fn [dst src]
+        writer (fn [^Range dst ^Range src]
                  (if (isa? (type src) clojure.lang.Seqable)
                    (let [write-size (min (count dst) (count src))]
                      (reset! coll (concat (take (.begin dst) @coll)
@@ -96,18 +96,18 @@
                      (Result. write-size write-size))))]
     (proxy [IntegerRange clojure.lang.Seqable clojure.lang.Counted]
            [begin end]
-      (seq [] (seq (->> @coll (take (.end this)) (drop (.begin this)))))
+      (seq [] (seq (->> @coll (take (.end ^IntegerRange this)) (drop (.begin ^IntegerRange this)))))
       (count [] (r/size this))
       (writeImpl [src] (writer this src))
       (readImpl [ts] nil)
-      (iterator [] (.iterator (seq this))))))
+      (iterator [] (.iterator ^Iterable (seq this))))))
 
-(defn another-range [begin end coll]
+(defn another-range ^ProxyRange [begin end coll]
   (let [range (srange begin end coll)]
     (r/proxy range
       (writeImpl [ts] nil)
       (readImpl [ts]
-         (let [writer (if (isa? (type ts) ProxyRange) (.range ts) ts)]
+         (let [^Range writer (if (isa? (type ts) ProxyRange) (.range ^ProxyRange ts) ts)]
            (or (.read range writer) (.write writer range)))))))
 
 (deftest simple-seq-based-range

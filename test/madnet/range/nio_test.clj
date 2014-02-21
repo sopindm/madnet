@@ -18,8 +18,8 @@
 ;; nio range
 ;;
 
-(defn- nrange [begin end buffer]
-  (Range. begin end buffer))
+(defn- nrange ^madnet.range.nio.Range [begin end buffer]
+   (Range. begin end buffer))
 
 (deftest making-nio-range
   (let [b (ByteBuffer/allocate 1024)
@@ -50,7 +50,7 @@
 ;; byte range
 ;;
 
-(defn byte-range [begin end buffer]
+(defn byte-range ^madnet.range.nio.ByteRange [begin end buffer]
   (ByteRange. begin end buffer))
 
 (deftest making-byte-range
@@ -123,7 +123,7 @@
 ;; Char Range
 ;;
 
-(defn- char-range [begin end buffer]
+(defn- char-range ^madnet.range.nio.CharRange [begin end buffer]
   (CharRange. begin end buffer))
 
 (deftest making-char-range
@@ -147,7 +147,7 @@
 (deftest writing-char-range-to-char-range
   (letfn [(char-range- [begin end chars]
             (char-range begin end (CharBuffer/wrap (char-array chars))))
-          (?write= [dst src str]
+          (?write= [^madnet.channel.IChannel dst src str]
             (let [clone (.clone dst)]
               (c/write! dst src)
               (?= (seq clone) (seq str))))]
@@ -181,11 +181,11 @@
           (byte-range begin end (byte-buffer seq)))
         (char-range- [begin end seq]
           (char-range begin end (char-buffer seq)))
-        (?write= [cr br string]
+        (?write= [^madnet.range.nio.CharRange cr br string]
           (let [ccr (.clone cr)]
             (.writeBytes cr br (Charset/forName "UTF8"))
             (?= (seq ccr) (seq string))))
-        (?read= [cr br bytes]
+        (?read= [^madnet.range.nio.CharRange cr ^madnet.channel.IChannel br bytes]
           (let [cbr (.clone br)]
             (.readBytes cr br (Charset/forName "UTF8"))
             (?= (seq cbr) bytes)))]
@@ -222,7 +222,7 @@
       (?range= br [2 5])
       (?range= cr [2 2])))
   (deftest error-converting-bytes-to-chars
-    (?throws (.writeBytes (char-range- 0 10 (repeat 10 (char 0)))
+    (?throws (.writeBytes ^madnet.range.nio.CharRange (char-range- 0 10 (repeat 10 (char 0)))
                           (byte-range- 0 1 [-1])
                           (Charset/forName "UTF8"))
              java.nio.charset.CharacterCodingException)))

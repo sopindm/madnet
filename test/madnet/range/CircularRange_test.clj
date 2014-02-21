@@ -6,7 +6,7 @@
   (:import [madnet.range Range IntegerRange CircularRange ProxyRange ObjectRange]
            [madnet.channel Result]))
 
-(defn- crange [min max limit]
+(defn- crange ^CircularRange [min max limit]
   (CircularRange. (irange min max) limit))
 
 (deftest making-circular-ranges
@@ -65,15 +65,16 @@
     (?range= (.dropFirst cr2) [0 3])
     (?range= (.first cr2) [0 3])))
 
-(defn- circular [generator begin end coll]
+(defn- circular ^CircularRange [generator begin end coll]
   (if (<= begin end)
     (proxy [CircularRange clojure.lang.Seqable clojure.lang.Counted]
         [(generator begin end coll) (irange 0 (count coll))]
-      (seq [] (seq (concat (seq (.first this))
-                           (seq (-> this .clone .dropFirst .first)))))
+      (seq [] (seq (concat (seq (.first ^CircularRange this))
+                           (seq (-> ^CircularRange this .clone .dropFirst .first)))))
       (count [] (count (seq this))))
-    (doto (circular generator begin (count coll) coll)
-      (.expand end))))
+    (let [cr (circular generator begin (count coll) coll)]
+      (.expand cr  ^int end)
+      cr)))
 
 (deftest reading-and-writing-from-circular-ranges
   (let [r1 (circular srange 3 1 (repeat 5 nil))

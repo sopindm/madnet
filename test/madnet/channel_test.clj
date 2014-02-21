@@ -76,9 +76,9 @@
   (let [p (c/pipe)
         r (.reader p)
         w (.writer p)]
-    (with-open [reader r])
+    (with-open [^java.io.Closeable reader r])
     (?false (c/readable? r))
-    (with-open [writer w])
+    (with-open [^java.io.Closeable writer w])
     (?false (c/writeable? w)))
   (let [p (c/pipe)]
     (with-open [pipe p])

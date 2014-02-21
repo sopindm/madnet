@@ -6,7 +6,7 @@
   (:import [madnet.range IntegerRange ObjectRange]
            [madnet.channel Result]))
 
-(defn object-range [begin end content]
+(defn object-range ^ObjectRange [begin end ^java.util.Collection content]
   (ObjectRange. begin end (java.util.ArrayList. content)))
 
 (deftest making-object-range
