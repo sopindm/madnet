@@ -1,18 +1,18 @@
 package madnet.event;
 
+import java.util.AbstractSet;
+
 public interface IEventSet {
     //void cancel();
 
-    java.util.Collection<? extends IEvent> events();
-    Iterable<? extends IEvent> selections();
+    AbstractSet<? extends IEvent> events();
+    AbstractSet<? extends IEvent> selections();
+
+    void push(IEvent event);
     
-    //void selectNow();
+    IEventSet select();
+    IEventSet selectIn(long milliseconds);
+    IEventSet selectNow();
 
-    //void selectIn(int milliseconds);
-    //void selectIn(long milliseconds);
-    //void selectIn(double timeout);
-
-    void select() throws InterruptedException;
-
-    //void interrupt();
+    void interrupt();
 }

@@ -4,82 +4,97 @@ import java.util.Iterator;
 import java.util.AbstractSet;
 import java.util.HashSet;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
-public class TriggerSet implements IEventSet {
-    HashSet<Event> triggers;
-    HashSet<Event> selections;
+public class TriggerSet extends EventSet<Event> {
     LinkedBlockingQueue<Event> triggered;
 
     public TriggerSet() {
-        triggers = new HashSet<Event>();
-        selections = new HashSet<Event>();
         triggered = new LinkedBlockingQueue<Event>();
     }
 
-    public static class Event implements IEvent {
-        TriggerSet provider = null;
-
+    public static class Event extends madnet.event.Event {
         @Override
-        public void register(IEventSet provider) {
-            ((TriggerSet)provider).triggers.add(this);
-            this.provider = (TriggerSet)provider;
+        public TriggerSet provider() { 
+            return (TriggerSet)super.provider();
         }
 
         public void touch() {
-            provider.triggered.add(this);
-        }
-
-        @Override
-        public TriggerSet provider() {
-            return provider;
+            provider().triggered.add(this);
         }
     }
 
     @Override
-    public AbstractSet<Event> events() {
-        return triggers;
+    public void push(IEvent event) {
+        if(!(event instanceof Event))
+            throw new IllegalArgumentException();
+
+        events().add((Event)event);
     }
 
+    Thread selectionThread = null;
+
     @Override
-    public Iterable<Event> selections() {
-        final Iterator<Event> iterator = selections.iterator();
-
-        return new Iterable<Event> () {
-            @Override
-            public Iterator<Event> iterator() {
-                return new Iterator<Event>() {
-                    @Override
-                    public boolean hasNext() {
-                        return iterator.hasNext();
-                    }
-
-                    @Override
-                    public Event next() {
-                        Event next = iterator.next();
-                        iterator.remove();
-
-                        return next;
-                    }
-
-                    @Override
-                    public void remove() {
-                        throw new UnsupportedOperationException();
-                    }
-                };
+    public TriggerSet select() {
+        if(selections().size() == 0) {
+            try {
+                selectionThread = Thread.currentThread();
+                selections().add(triggered.take());
             }
-        };
+            catch(InterruptedException e) {
+            }
+            finally {
+                selectionThread = null;
+            }
+        }
+
+        selectNow();
+        return this;
     }
 
     @Override
-    public void select() throws InterruptedException {
-        if(selections.size() == 0)
-            selections.add(triggered.take());
+    public TriggerSet selectIn(long milliseconds) {
+        if(selections().size() == 0) {
+            Event event = null;
+            try {
+                selectionThread = Thread.currentThread();
+                event = triggered.poll(milliseconds, TimeUnit.MILLISECONDS);
+            }
+            catch(InterruptedException e) {
+            }
+            finally {
+                selectionThread = null;
+            }
 
+            if(event == null)
+                return this;
+
+            selections().add(event);
+        }
+
+        selectNow();
+        return this;
+    }
+
+    @Override
+    public TriggerSet selectNow() {
         while(triggered.size() > 0) {
             Event event = triggered.poll();
 
             if(event != null)
-                selections.add(event);
+                selections().add(event);
+        }
+
+        return this;
+    }
+
+    @Override
+    public void interrupt() {
+        if(selectionThread != null) {
+            Thread interruptedThread = selectionThread;
+
+            if(interruptedThread != null)
+                interruptedThread.interrupt();
         }
     }
 }

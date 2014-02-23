@@ -11,5 +11,6 @@ public interface IEvent {
 
     IEventSet provider();
 
-    //Object attachment();
+    void attach(Object attachment);
+    Object attachment();
 }

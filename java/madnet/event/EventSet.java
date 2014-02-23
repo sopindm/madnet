@@ -1,16 +1,19 @@
 package madnet.event;
 
-public interface EventSet {
-    EventSet push(IEvent event);
-    EventSet pop(IEvent event);
+import java.util.AbstractSet;
+import java.util.HashSet;
 
-    Iterable selectNow();
+public abstract class EventSet<Event extends madnet.event.Event> implements IEventSet {
+    HashSet<Event> events = new HashSet<Event>();
+    HashSet<Event> selections = new HashSet<Event>();
 
-    Iterable selectIn(int milliseconds);
-    Iterable selectIn(long milliseconds);
-    Iterable selectIn(double timeout);
+    @Override
+    public AbstractSet<Event> events() {
+        return events;
+    }
 
-    Iterable select();
-
-    void interupt();
+    @Override
+    public AbstractSet<Event> selections() {
+        return selections;
+    }
 }
