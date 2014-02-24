@@ -1,6 +1,8 @@
 (ns madnet.event-test
   (:require [khazad-dum :refer :all]
-            [madnet.event :as e]))
+            [madnet.event :as e])
+  (:import [java.nio.channels ClosedSelectorException]
+           [madnet.event Event EventSet]))
 
 ;;
 ;; Triggers
@@ -112,15 +114,54 @@
     (Thread/sleep 2)
     (?true (realized? f))))
 
-;canceling triggers
-;canceling provider
+(deftest canceling-trigger
+  (let [[t1 t2] (repeatedly 2 e/trigger)
+        s (e/trigger-set t1 t2)]
+    (e/cancel t1)
+    (e/select s :timeout 0)
+    (?= (set (e/events s)) #{t2})
+    (let [f (future (e/select s :timeout 4))]
+      (Thread/sleep 2)
+      (e/cancel t2)
+      (?= (set @f) #{})
+      (?= (set (e/events s)) #{}))))
 
-;one shot triggers
+(deftest closing-provider
+  (let [t (e/trigger)
+        s (e/trigger-set t)]
+    (e/touch! t)
+    (.close s)
+    (?= (.provider t) nil)
+    (?= (seq (e/events s)) nil)
+    (?= (seq (.selections s)) nil)
+    (?throws (e/select s) ClosedSelectorException)
+    (?throws (e/select s :timeout 0) ClosedSelectorException)
+    (?throws (e/select s :timeout 10) ClosedSelectorException)
+    (?throws (e/conj! s t) ClosedSelectorException)))
 
-;adding trigger to wrong set
-;adding wrong event to trigger set
+(deftest closing-event
+  (let [t (e/trigger 123)
+        s (e/trigger-set t)]
+    (?= (.provider t) s)
+    (e/touch! t)
+    (.close t)
+    (?= (.provider t) nil)
+    (e/select s :timeout 0)
+    (?= (seq (e/events s)) nil)
+    (?= (seq (.selections s)) nil)
+    (?= (e/attachment t) nil)))
+
+(deftest errors-adding-trigger
+  (let [t (e/trigger)
+        s (e/trigger-set)]
+    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) t)
+             IllegalArgumentException)))
 
 ;;
-;; Timeouts
+;; Timers
 ;;
 
+;;
+;; Selectors
+;;

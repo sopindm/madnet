@@ -1,8 +1,8 @@
 package madnet.event;
 
-public interface IEvent {
+public interface IEvent extends java.io.Closeable {
     void register(IEventSet set);
-    //void cancel();
+    void cancel();
 
     //boolean persistent();
 

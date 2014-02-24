@@ -17,6 +17,9 @@
   (.register event set)
   set)
 
+(defn events [set]
+  (.events set))
+
 (defn select [set & {:as options}]
   (let [timeout (:timeout options)
         now? (and timeout (zero? timeout))]
@@ -27,6 +30,12 @@
 
 (defn interrupt [set]
   (.interrupt set))
+
+(defn cancel [x]
+  (.cancel x))
+
+(defn close [x]
+  (.close x))
 
 ;;
 ;; Trigger events and sets

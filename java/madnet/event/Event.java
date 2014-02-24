@@ -15,6 +15,20 @@ public abstract class Event implements IEvent {
         this.provider = (EventSet)provider;
     }
 
+    @Override
+    public void close() {
+        cancel();
+        attachment = null;
+    }
+
+    @Override
+    public void cancel() {
+        if(provider != null) {
+            provider.pop(this);
+            provider = null;
+        }
+    }
+
     Object attachment = null;
 
     @Override

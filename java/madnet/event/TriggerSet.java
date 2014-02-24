@@ -1,17 +1,14 @@
 package madnet.event;
 
+import java.nio.channels.ClosedSelectorException;
 import java.util.Iterator;
 import java.util.AbstractSet;
 import java.util.HashSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public class TriggerSet extends EventSet<Event> {
-    LinkedBlockingQueue<Event> triggered;
-
-    public TriggerSet() {
-        triggered = new LinkedBlockingQueue<Event>();
-    }
+public class TriggerSet extends EventSet<TriggerSet.Event> {
+    LinkedBlockingQueue<Event> triggered = new LinkedBlockingQueue<Event>();
 
     public static class Event extends madnet.event.Event {
         @Override
@@ -19,27 +16,87 @@ public class TriggerSet extends EventSet<Event> {
             return (TriggerSet)super.provider();
         }
 
+        @Override
+        public void register(IEventSet provider) {
+            if(!(provider instanceof TriggerSet))
+                throw new IllegalArgumentException();
+
+            super.register(provider);
+        }
+
         public void touch() {
             provider().triggered.add(this);
+        }
+
+        private void cancelProvider() {
+            provider = null;
         }
     }
 
     @Override
+    public void close() {
+        for(Event e : events())
+            e.cancelProvider();
+
+        super.close();
+    }
+
+    @Override
     public void push(IEvent event) {
+        if(isClosed())
+            throw new ClosedSelectorException();
+
         if(!(event instanceof Event))
             throw new IllegalArgumentException();
 
         events().add((Event)event);
     }
 
+    @Override
+    public void pop(IEvent event) {
+        if(isClosed())
+            throw new ClosedSelectorException();
+
+        if(!(event instanceof Event))
+            throw new IllegalArgumentException();
+
+        canceling.add((Event)event);
+    }
+
+    private void cancelEvents() {
+        while(!canceling.isEmpty()) {
+            Event e = canceling.poll();
+
+            if(e != null) {
+                events().remove(e);
+                selections().remove(e);
+            }
+        }
+    }
+
+    private void pushSelection(Event e) {
+        if(e == null)
+            return;
+
+        if(e.provider() != this)
+            return;
+
+        selections().add(e);
+    }
+
     Thread selectionThread = null;
 
     @Override
     public TriggerSet select() {
+        if(isClosed())
+            throw new ClosedSelectorException();
+
+        cancelEvents();
+
         if(selections().size() == 0) {
             try {
                 selectionThread = Thread.currentThread();
-                selections().add(triggered.take());
+                pushSelection(triggered.take());
             }
             catch(InterruptedException e) {
             }
@@ -54,22 +111,21 @@ public class TriggerSet extends EventSet<Event> {
 
     @Override
     public TriggerSet selectIn(long milliseconds) {
+        if(isClosed())
+            throw new ClosedSelectorException();
+
+        cancelEvents();
+
         if(selections().size() == 0) {
-            Event event = null;
             try {
                 selectionThread = Thread.currentThread();
-                event = triggered.poll(milliseconds, TimeUnit.MILLISECONDS);
+                pushSelection(triggered.poll(milliseconds, TimeUnit.MILLISECONDS));
             }
             catch(InterruptedException e) {
             }
             finally {
                 selectionThread = null;
             }
-
-            if(event == null)
-                return this;
-
-            selections().add(event);
         }
 
         selectNow();
@@ -78,11 +134,13 @@ public class TriggerSet extends EventSet<Event> {
 
     @Override
     public TriggerSet selectNow() {
-        while(triggered.size() > 0) {
-            Event event = triggered.poll();
+        if(isClosed())
+            throw new ClosedSelectorException();
 
-            if(event != null)
-                selections().add(event);
+        cancelEvents();
+
+        while(triggered.size() > 0) {
+            pushSelection(triggered.poll());
         }
 
         return this;
