@@ -1,7 +1,7 @@
 (ns madnet.event
   (:refer-clojure :exclude [conj!])
   (:require [clojure.set :as s])
-  (:import [madnet.event TriggerEvent TriggerSet]))
+  (:import [madnet.event TriggerEvent TriggerSet TimerEvent TimerSet]))
 
 ;;
 ;; Abstract events and sets
@@ -37,19 +37,6 @@
 (defn close [x]
   (.close x))
 
-;;
-;; Trigger events and sets
-;;
-
-(defn trigger-set [& triggers]
-  (reduce conj! (TriggerSet.) triggers))
-
-(defn trigger
-  ([] (TriggerEvent.))
-  ([attachment] (doto (TriggerEvent.) (attach! attachment))))
-
-(defn touch! [& triggers]
-  (doseq [trigger triggers] (.touch trigger)))
 
 (defmacro do-selections [[var selector] & body]
   `(let [selections# (select ~selector)
@@ -69,4 +56,33 @@
        (.remove iterator#))
      (persistent! coll#)))
 
+;;
+;; Trigger events and sets
+;;
 
+(defn trigger-set [& triggers]
+  (reduce conj! (TriggerSet.) triggers))
+
+(defn trigger
+  ([] (TriggerEvent.))
+  ([attachment] (doto (TriggerEvent.) (attach! attachment))))
+
+(defn touch! [& triggers]
+  (doseq [trigger triggers] (.touch trigger)))
+
+;;
+;; Timer events
+;;
+
+(defn timer
+  ([milliseconds] (TimerEvent. milliseconds))
+  ([milliseconds attachment] (doto (timer milliseconds) (attach! attachment))))
+
+(defn timer-set [& timers]
+  (reduce conj! (TimerSet.) timers))
+
+(defn start! [timer]
+  (.start timer))
+
+(defn stop! [timer]
+  (.stop timer))

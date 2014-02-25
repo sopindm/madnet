@@ -2,30 +2,73 @@ package madnet.event;
 
 import java.nio.channels.ClosedSelectorException;
 import java.util.Iterator;
-import java.util.AbstractSet;
-import java.util.HashSet;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.SortedMap;
 import java.util.concurrent.TimeUnit;
 
-public class TriggerSet extends EventSet<TriggerSet.Event> {
-    LinkedBlockingQueue<Event> triggered = new LinkedBlockingQueue<Event>();
+public class TimerSet extends EventSet<TimerSet.Event> {
+    SortedMap<Long, LinkedList<Event>> timeouts = new java.util.TreeMap<Long, LinkedList<Event>>();
 
     public static class Event extends madnet.event.Event {
+        long timeout;
+        long finishStamp = 0;
+
+        public Event(long millisecondsTimeout) {
+            timeout = millisecondsTimeout;
+        }
+
+        public long timeout() {
+            return timeout;
+        }
+
+        public void setTimeout(long timeout) {
+            this.timeout = timeout;
+        }
+
         @Override
-        public TriggerSet provider() { 
-            return (TriggerSet)super.provider();
+        public TimerSet provider() { 
+            return (TimerSet)super.provider();
         }
 
         @Override
         public void register(IEventSet provider) {
-            if(!(provider instanceof TriggerSet))
+            if(!(provider instanceof TimerSet))
                 throw new IllegalArgumentException();
 
             super.register(provider);
         }
 
-        public void touch() {
-            provider().triggered.add(this);
+        public void start() {
+            finishStamp = System.currentTimeMillis() + timeout;
+
+            LinkedList<Event> entry = provider().timeouts.get(finishStamp);
+
+            if(entry == null) {
+                entry = new LinkedList<Event>();
+                provider().timeouts.put(finishStamp, entry);
+            }
+
+            entry.add(this);
+        }
+
+        @Override
+        public void cancel() {
+            stop();
+            super.cancel();
+        }
+
+        public void stop() {
+            LinkedList<Event> event = provider().timeouts.get(finishStamp);
+            if(event == null)
+                return;
+
+            if(event.size() == 1)
+                provider().timeouts.remove(finishStamp);
+            else
+                event.remove(this);
+
+            finishStamp = 0;
         }
 
         private void cancelProvider() {
@@ -37,8 +80,6 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
     public void close() {
         for(Event e : events())
             e.cancelProvider();
-
-        triggered.clear();
 
         super.close();
     }
@@ -89,16 +130,45 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
     Thread selectionThread = null;
 
     @Override
-    public TriggerSet select() {
+    public TimerSet select() {
         if(isClosed())
             throw new ClosedSelectorException();
 
         cancelEvents();
 
-        if(selections().size() == 0 && events.size() > 0) {
+        long timestamp = System.currentTimeMillis();
+
+        if(selections().size() == 0 && events.size() > 0 && timeouts.size() > 0
+           && timeouts.firstKey() > timestamp) {
             try {
                 selectionThread = Thread.currentThread();
-                pushSelection(triggered.take());
+                Thread.sleep(timeouts.firstKey() - timestamp);
+            }
+            catch(InterruptedException e) {
+            }
+            finally {
+                selectionThread = null;
+            }
+        }
+        
+        selectNow();
+        return this;
+    }
+
+    @Override
+    public TimerSet selectIn(long milliseconds) {
+        if(isClosed())
+            throw new ClosedSelectorException();
+
+        cancelEvents();
+
+        long timestamp = System.currentTimeMillis();
+
+        if(selections().size() == 0 && events.size() > 0 && timeouts.size() > 0
+           && timeouts.firstKey() > timestamp) {
+            try {
+                selectionThread = Thread.currentThread();
+                Thread.sleep(Math.min(timeouts.firstKey() - timestamp, milliseconds));
             }
             catch(InterruptedException e) {
             }
@@ -112,37 +182,27 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
     }
 
     @Override
-    public TriggerSet selectIn(long milliseconds) {
+    public TimerSet selectNow() {
         if(isClosed())
             throw new ClosedSelectorException();
 
         cancelEvents();
 
-        if(selections().size() == 0 && events.size() > 0) {
-            try {
-                selectionThread = Thread.currentThread();
-                pushSelection(triggered.poll(milliseconds, TimeUnit.MILLISECONDS));
+        long timestamp = System.currentTimeMillis();
+
+        Iterator<Map.Entry<Long, LinkedList<Event>>> iterator = timeouts.entrySet().iterator();
+
+        while(iterator.hasNext()) {
+            Map.Entry<Long, LinkedList<Event>> entry = iterator.next();
+
+            if(entry.getKey() <= timestamp) {
+                for(Event e : entry.getValue())
+                    selections().add(e);
+
+                iterator.remove();
             }
-            catch(InterruptedException e) {
-            }
-            finally {
-                selectionThread = null;
-            }
-        }
-
-        selectNow();
-        return this;
-    }
-
-    @Override
-    public TriggerSet selectNow() {
-        if(isClosed())
-            throw new ClosedSelectorException();
-
-        cancelEvents();
-
-        while(triggered.size() > 0) {
-            pushSelection(triggered.poll());
+            else
+                break;
         }
 
         return this;
