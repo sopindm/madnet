@@ -32,13 +32,14 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         }
 
         @Override
-        public void register(IEventSet provider) {
+        public void register(IEventSet provider) throws Exception {
             if(!(provider instanceof TimerSet))
                 throw new IllegalArgumentException();
 
             super.register(provider);
         }
 
+        @Override
         public void start() {
             finishStamp = System.currentTimeMillis() + timeout;
 
@@ -53,11 +54,12 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         }
 
         @Override
-        public void cancel() {
+        public void cancel() throws java.io.IOException {
             stop();
             super.cancel();
         }
 
+        @Override
         public void stop() {
             LinkedList<Event> event = provider().timeouts.get(finishStamp);
             if(event == null)

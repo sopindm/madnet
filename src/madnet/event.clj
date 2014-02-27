@@ -1,7 +1,8 @@
 (ns madnet.event
   (:refer-clojure :exclude [conj!])
   (:require [clojure.set :as s])
-  (:import [madnet.event TriggerEvent TriggerSet TimerEvent TimerSet]))
+  (:import [madnet.event TriggerEvent TriggerSet TimerEvent TimerSet SelectorEvent SelectorSet]
+           [java.nio.channels SelectionKey]))
 
 ;;
 ;; Abstract events and sets
@@ -56,6 +57,12 @@
        (.remove iterator#))
      (persistent! coll#)))
 
+(defn start! [& events]
+  (doall (map #(.start %) events)))
+
+(defn stop! [& events]
+  (doall (map #(.stop %) events)))
+
 ;;
 ;; Trigger events and sets
 ;;
@@ -66,9 +73,6 @@
 (defn trigger
   ([] (TriggerEvent.))
   ([attachment] (doto (TriggerEvent.) (attach! attachment))))
-
-(defn touch! [& triggers]
-  (doseq [trigger triggers] (.touch trigger)))
 
 ;;
 ;; Timer events
@@ -81,8 +85,19 @@
 (defn timer-set [& timers]
   (reduce conj! (TimerSet.) timers))
 
-(defn start! [timer]
-  (.start timer))
+;;
+;; Selectors
+;;
 
-(defn stop! [timer]
-  (.stop timer))
+(defn selector [channel operation]
+  (let [op-code (case operation
+                  :read SelectionKey/OP_READ
+                  :write SelectionKey/OP_WRITE)]
+    (when (and (= operation :write) (not (instance? java.nio.channels.WritableByteChannel channel)))
+      (throw (IllegalArgumentException.)))
+    (when (and (= operation :read) (not (instance? java.nio.channels.ReadableByteChannel channel)))
+      (throw (IllegalArgumentException.)))
+    (SelectorEvent. channel op-code)))
+
+(defn selector-set [& events]
+  (reduce conj! (SelectorSet.) events))

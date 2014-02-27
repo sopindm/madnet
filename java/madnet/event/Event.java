@@ -7,7 +7,7 @@ public abstract class Event implements IEvent {
     public EventSet provider() { return provider; };
 
     @Override
-    public void register(IEventSet provider) {
+    public void register(IEventSet provider) throws Exception {
         if(this.provider != null)
             throw new IllegalArgumentException();
         
@@ -16,13 +16,13 @@ public abstract class Event implements IEvent {
     }
 
     @Override
-    public void close() {
+    public void close() throws java.io.IOException {
         cancel();
         attachment = null;
     }
 
     @Override
-    public void cancel() {
+    public void cancel() throws java.io.IOException {
         if(provider != null) {
             provider.pop(this);
             provider = null;

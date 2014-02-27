@@ -12,38 +12,38 @@
   (let [s (e/trigger-set)
         t (e/trigger)]
     (e/conj! s t)
-    (e/touch! t)
+    (e/start! t)
     (?= (seq (e/select s)) [t])))
 
 (deftest touching-no-registered-trigger
-  (?throws (e/touch! (e/trigger)) NullPointerException))
+  (?throws (e/start! (e/trigger)) NullPointerException))
 
 (deftest touching-trigger-twice-has-no-effect
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/touch! t)
-    (e/touch! t)
+    (e/start! t)
+    (e/start! t)
     (?= (seq (e/select s)) [t])))
 
 (deftest touching-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (dorun (map e/touch! [t1 t2]))
+    (dorun (map e/start! [t1 t2]))
     (?= (set (e/select s)) #{t1 t2})))
 
 (deftest touching-set-with-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/touch! t1)
+    (e/start! t1)
     (?= (seq (e/select s)) [t1])))
 
-(deftest select!-is-blocking
+(deftest select!-is-blocking-for-triggers
   (let [t (e/trigger)
         s (e/trigger-set t)
         f (future (e/select s))]
     (Thread/sleep 10)
     (?false (realized? f))
-    (e/touch! t)
+    (e/start! t)
     (let [a (agent f)]
       (send-off a #(deref %))
       (when (not (await-for 1000 a)) (throw (RuntimeException. "Agent timeout")))
@@ -52,8 +52,8 @@
 (deftest do-selections-test
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/touch! t1)
-    (e/touch! t2)
+    (e/start! t1)
+    (e/start! t2)
     (let [a (atom [])]
       (e/do-selections [e s]
         (swap! a conj e))
@@ -63,7 +63,7 @@
 (deftest for-selections-test
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/touch! t1 t2)
+    (e/start! t1 t2)
     (?= (set (e/for-selections [e s] e))
         #{t1 t2})))
 
@@ -79,15 +79,15 @@
     (e/attach! t 123)
     (?= (e/attachment t) 123)))
     
-(deftest selecting-now
+(deftest selecting-tirgger-now
   (let [s (e/trigger-set)]
     (?= (seq (e/select s :timeout 0)) nil)
     (let [t (e/trigger)]
       (e/conj! s t)
-      (e/touch! t)
+      (e/start! t)
       (?= (seq (e/select s :timeout 0)) [t]))))
 
-(deftest selecting-with-timeout
+(deftest selecting-trigger-with-timeout
   (let [s (e/trigger-set (e/trigger))
         f (future (e/select s :timeout 3))]
     (Thread/sleep 1)
@@ -95,7 +95,7 @@
     (Thread/sleep 6)
     (?true (realized? f))))
 
-(deftest interrupting-selection
+(deftest interrupting-trigger-selection
   (let [s (e/trigger-set (e/trigger))
         f (future (e/select s))]
     (Thread/sleep 5)
@@ -105,7 +105,7 @@
     (?true (realized? f))
     (?= (seq (.selections s)) nil)))
     
-(deftest single-interrupt-does-not-interrupt-two-selections
+(deftest single-trigger-interrupt-does-not-interrupt-two-selections
   (let [s (e/trigger-set (e/trigger))
         f (future (e/select s)
                   (e/select s))]
@@ -129,10 +129,10 @@
       (?= (set @f) #{})
       (?= (set (e/events s)) #{}))))
 
-(deftest closing-provider
+(deftest closing-trigger-provider
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/touch! t)
+    (e/start! t)
     (.close s)
     (?= (.provider t) nil)
     (?= (seq (e/events s)) nil)
@@ -142,11 +142,11 @@
     (?throws (e/select s :timeout 10) ClosedSelectorException)
     (?throws (e/conj! s t) ClosedSelectorException)))
 
-(deftest closing-event
+(deftest closing-tirgger-event
   (let [t (e/trigger 123)
         s (e/trigger-set t)]
     (?= (.provider t) s)
-    (e/touch! t)
+    (e/start! t)
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
@@ -317,19 +317,98 @@
     (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) t)
              IllegalArgumentException)))
 
-;remove touch!, use start!
-
 ;;
 ;; Selectors
 ;;
 
-;simple selector
-;empty selector set doesn't block
-;cannot trigger selector twice
-;can use several events
-;selecting with timeout
-;interrupting timer
-;canceling event
-;closing selector provider
-;adding selector to wrong set
+(defn pipe- []
+  (let [pipe (java.nio.channels.Pipe/open)]
+    (.configureBlocking (.sink pipe) false)
+    (.configureBlocking (.source pipe) false)
+    [(.source pipe) (.sink pipe)]))
+
+(defmacro with-pipe-events [[source sink reader writer set] & body]
+  `(let [[~source ~sink] (pipe-)
+         ~reader (e/selector ~source :read)
+         ~writer (e/selector ~sink :write)
+         ~set (e/selector-set ~reader ~writer)]
+     ~@body))
+
+(deftest making-selector
+  (with-pipe-events [sr sw reader writer s]
+    (e/start! reader writer)
+    (?= (seq (e/select s)) [writer])
+    (?= (.provider reader) s))
+  (with-pipe-events [reader writer re we s]
+    (e/start! re we)
+    (.write writer (java.nio.ByteBuffer/wrap (byte-array (map byte [1 2 3]))))
+    (?= (set (e/select s)) #{re we}))
+  (?throws (e/selector (.source (java.nio.channels.Pipe/open)) :write) IllegalArgumentException)
+  (?throws (e/selector (.sink (java.nio.channels.Pipe/open)) :read) IllegalArgumentException))
+
+(deftest selectors-with-timeout
+  (?= (seq (e/select (e/selector-set) :timeout 0)) nil)
+  (let [f (future (e/select (e/selector-set) :timeout 4))]
+    (Thread/sleep 2)
+    (?false (realized? f))
+    (Thread/sleep 4)
+    (?true (realized? f))))
+
+(deftest interrupting-selector
+  (let [s (e/selector-set)
+        f (future (e/select s))]
+    (Thread/sleep 2)
+    (?false (realized? f))
+    (e/interrupt s)
+    (Thread/sleep 1)
+    (?true (realized? f))))
+
+(deftest canceling-selector-event
+  (with-pipe-events [reader writer re we s]
+    (e/start! re we)
+    (.write writer (java.nio.ByteBuffer/wrap (byte-array (map byte (range 10)))))
+    (e/cancel we)
+    (?= (seq (e/select s)) [re])
+    (?= (seq (e/events s)) [re])
+    (?= (.provider we) nil)))
+
+(deftest closing-selector-set
+  (with-pipe-events [reader writer re we s]
+    (e/start! re we)
+    (.close s)
+    (?= (.provider re) nil)
+    (?= (.provider we) nil)
+    (?= (seq (e/events s)) nil)
+    (?= (seq (.selections s)) nil)
+    (?throws (e/select s) ClosedSelectorException)
+    (?throws (e/select s :timeout 0) ClosedSelectorException)
+    (?throws (e/select s :timeout 10) ClosedSelectorException)
+    (?throws (e/conj! s we) ClosedSelectorException)))
+
+(deftest selector-attachments
+  (let [[reader writer] (pipe-)
+        e (e/selector reader :read)]
+    (?= (e/attachment e) nil)
+    (e/attach! e 123)
+    (?= (e/attachment e) 123)))
+
+(deftest errors-adding-selector
+  (let [e (e/selector (first (pipe-)) :read)
+        s (e/selector-set)]
+    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) e)
+             IllegalArgumentException)))
+
+(deftest closing-event
+  (let [[reader _] (pipe-)
+        e (e/selector reader :read)
+        s (e/selector-set e)]
+    (e/attach! e 123)
+    (.close e)
+    (e/select s :timeout 0)
+    (?= (e/attachment e) nil)
+    (?= (.provider e) nil)
+    (?= (seq (e/events s)) nil)))
+
+;accept and connect selectors
 

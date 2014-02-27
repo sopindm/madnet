@@ -17,15 +17,20 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
         }
 
         @Override
-        public void register(IEventSet provider) {
+        public void register(IEventSet provider) throws Exception {
             if(!(provider instanceof TriggerSet))
                 throw new IllegalArgumentException();
 
             super.register(provider);
         }
 
-        public void touch() {
+        @Override
+        public void start() {
             provider().triggered.add(this);
+        }
+
+        @Override
+        public void stop() {
         }
 
         private void cancelProvider() {
