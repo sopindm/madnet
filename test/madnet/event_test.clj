@@ -410,5 +410,21 @@
     (?= (.provider e) nil)
     (?= (seq (e/events s)) nil)))
 
-;accept and connect selectors
+(deftest accept-event
+  (let [accept-ch (java.nio.channels.ServerSocketChannel/open)]
+    (e/selector accept-ch :accept)
+    (?throws (e/selector accept-ch :read) IllegalArgumentException)
+    (?throws (e/selector accept-ch :write) IllegalArgumentException)
+    (?throws (e/selector accept-ch :connect) IllegalArgumentException))
+  (let [[reader writer] (pipe-)]
+    (?throws (e/selector reader :accept) IllegalArgumentException)
+    (?throws (e/selector reader :connect) IllegalArgumentException)
+    (?throws (e/selector writer :accept) IllegalArgumentException)
+    (?throws (e/selector writer :connect) IllegalArgumentException))
+  (let [connect-ch (java.nio.channels.SocketChannel/open)]
+    (e/selector connect-ch :connect)
+    (e/selector connect-ch :read)
+    (e/selector connect-ch :write)
+    (?throws (e/selector connect-ch :accept) IllegalArgumentException)))
+
 

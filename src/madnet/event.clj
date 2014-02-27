@@ -92,11 +92,16 @@
 (defn selector [channel operation]
   (let [op-code (case operation
                   :read SelectionKey/OP_READ
-                  :write SelectionKey/OP_WRITE)]
-    (when (and (= operation :write) (not (instance? java.nio.channels.WritableByteChannel channel)))
-      (throw (IllegalArgumentException.)))
-    (when (and (= operation :read) (not (instance? java.nio.channels.ReadableByteChannel channel)))
-      (throw (IllegalArgumentException.)))
+                  :write SelectionKey/OP_WRITE
+                  :accept SelectionKey/OP_ACCEPT
+                  :connect SelectionKey/OP_CONNECT)]
+    (letfn [(check-option [name type]
+              (when (and (= operation name) (not (instance? type channel)))
+                (throw (IllegalArgumentException.))))]
+      (check-option :write java.nio.channels.WritableByteChannel)
+      (check-option :read java.nio.channels.ReadableByteChannel)
+      (check-option :accept java.nio.channels.ServerSocketChannel)
+      (check-option :connect java.nio.channels.SocketChannel))
     (SelectorEvent. channel op-code)))
 
 (defn selector-set [& events]
