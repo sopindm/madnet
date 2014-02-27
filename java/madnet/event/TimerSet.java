@@ -33,10 +33,10 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
         @Override
         public void register(IEventSet provider) throws Exception {
-            if(!(provider instanceof TimerSet))
-                throw new IllegalArgumentException();
-
             super.register(provider);
+
+            if(!(this.provider instanceof TimerSet))
+                throw new IllegalArgumentException();
         }
 
         @Override
@@ -87,7 +87,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
     }
 
     @Override
-    public void push(IEvent event) {
+    public TimerSet push(IEvent event) {
         if(isClosed())
             throw new ClosedSelectorException();
 
@@ -95,6 +95,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
             throw new IllegalArgumentException();
 
         events().add((Event)event);
+        return this;
     }
 
     @Override

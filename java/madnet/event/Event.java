@@ -11,8 +11,7 @@ public abstract class Event implements IEvent {
         if(this.provider != null)
             throw new IllegalArgumentException();
         
-        provider.push(this);
-        this.provider = (EventSet)provider;
+        this.provider = (EventSet)provider.push(this);
     }
 
     @Override

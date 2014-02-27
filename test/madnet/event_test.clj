@@ -332,7 +332,9 @@
          ~reader (e/selector ~source :read)
          ~writer (e/selector ~sink :write)
          ~set (e/selector-set ~reader ~writer)]
-     ~@body))
+     ~@body
+     (.close ~source)
+     (.close ~sink)))
 
 (deftest making-selector
   (with-pipe-events [sr sw reader writer s]
@@ -345,6 +347,11 @@
     (?= (set (e/select s)) #{re we}))
   (?throws (e/selector (.source (java.nio.channels.Pipe/open)) :write) IllegalArgumentException)
   (?throws (e/selector (.sink (java.nio.channels.Pipe/open)) :read) IllegalArgumentException))
+
+(deftest registering-select-event-twice
+  (let [e (e/selector (first (pipe-)) :read)]
+    (e/conj! (e/selector-set) e)
+    (?throws (e/conj! (e/selector-set) e) IllegalArgumentException)))
 
 (deftest selectors-with-timeout
   (?= (seq (e/select (e/selector-set) :timeout 0)) nil)
@@ -426,5 +433,39 @@
     (e/selector connect-ch :read)
     (e/selector connect-ch :write)
     (?throws (e/selector connect-ch :accept) IllegalArgumentException)))
+
+;;
+;; Events multiset
+;;
+
+(deftest making-multiset
+  (let [trigger (e/trigger)
+        timer (e/timer 123)
+        selector (e/selector (first (pipe-)) :read)
+        s (e/event-set trigger timer selector)]
+    (?= (set (e/events s)) #{trigger timer selector})
+    (?= (-> s .triggers e/events seq) [trigger])
+    (?= (-> s .timers e/events seq) [timer])
+    (?= (-> s .selectors e/events seq) [selector])
+    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)))
+
+(deftest selecting-on-multiset-with-trigger
+  (let [trigger (e/trigger)
+        timer (e/timer 1000)
+        [reader writer] (pipe-)
+        selector (e/selector reader :read)
+        s (e/event-set trigger timer selector)]
+    (e/start! trigger timer selector)
+    (?= (e/for-selections [e s] e) [trigger])))
+
+;selecting with timer
+;selecting with selector
+
+;selecting now
+;selecting with timeout
+;interrupting
+
+;closing multiset
+;canceling multiset event
 
 

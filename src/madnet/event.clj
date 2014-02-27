@@ -63,6 +63,9 @@
 (defn stop! [& events]
   (doall (map #(.stop %) events)))
 
+(defn event-set [& events]
+  (reduce conj! (madnet.event.MultiEventSet.) events))
+
 ;;
 ;; Trigger events and sets
 ;;
@@ -106,3 +109,4 @@
 
 (defn selector-set [& events]
   (reduce conj! (SelectorSet.) events))
+

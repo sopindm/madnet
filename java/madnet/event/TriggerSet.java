@@ -18,10 +18,10 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
         @Override
         public void register(IEventSet provider) throws Exception {
-            if(!(provider instanceof TriggerSet))
-                throw new IllegalArgumentException();
-
             super.register(provider);
+
+            if(!(this.provider instanceof TriggerSet))
+                throw new IllegalArgumentException();
         }
 
         @Override
@@ -49,7 +49,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
     }
 
     @Override
-    public void push(IEvent event) {
+    public TriggerSet push(IEvent event) {
         if(isClosed())
             throw new ClosedSelectorException();
 
@@ -57,6 +57,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
             throw new IllegalArgumentException();
 
         events().add((Event)event);
+        return this;
     }
 
     @Override

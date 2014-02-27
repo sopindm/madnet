@@ -76,11 +76,13 @@ public class SelectorSet implements IEventSet {
 
         @Override
         public void register(IEventSet set) throws Exception {
-            if(!(set instanceof SelectorSet))
+            if(provider != null)
                 throw new IllegalArgumentException();
 
-            ((SelectorSet)set).push(this);
-            provider = ((SelectorSet)set);
+            provider = (SelectorSet)set.push(this);
+
+            if(provider == null)
+                throw new IllegalArgumentException();
         }
 
         private void register(Selector selector) throws Exception {
@@ -124,11 +126,12 @@ public class SelectorSet implements IEventSet {
     }
 
     @Override
-    public void push(IEvent event) throws Exception {
+    public SelectorSet push(IEvent event) throws Exception {
         if(!(event instanceof Event))
             throw new IllegalArgumentException();
 
         ((Event)event).register(selector);
+        return this;
     }
 
     @Override
