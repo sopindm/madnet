@@ -10,6 +10,13 @@ import java.util.concurrent.TimeUnit;
 public class TimerSet extends EventSet<TimerSet.Event> {
     SortedMap<Long, LinkedList<Event>> timeouts = new java.util.TreeMap<Long, LinkedList<Event>>();
 
+    public Long timeout() {
+        if(timeouts.size() == 0)
+            return null;
+
+        return timeouts.firstKey() - System.currentTimeMillis();
+    }
+
     public static class Event extends madnet.event.Event {
         long timeout;
         long finishStamp = 0;
@@ -88,7 +95,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public TimerSet push(IEvent event) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         if(!(event instanceof Event))
@@ -100,7 +107,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public void pop(IEvent event) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         if(!(event instanceof Event))
@@ -134,7 +141,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public TimerSet select() {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();
@@ -160,7 +167,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public TimerSet selectIn(long milliseconds) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();
@@ -186,7 +193,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public TimerSet selectNow() {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();

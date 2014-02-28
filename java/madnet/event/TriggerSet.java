@@ -50,7 +50,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public TriggerSet push(IEvent event) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         if(!(event instanceof Event))
@@ -62,7 +62,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public void pop(IEvent event) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         if(!(event instanceof Event))
@@ -96,7 +96,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public TriggerSet select() {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();
@@ -119,7 +119,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public TriggerSet selectIn(long milliseconds) {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();
@@ -142,7 +142,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public TriggerSet selectNow() {
-        if(isClosed())
+        if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelEvents();

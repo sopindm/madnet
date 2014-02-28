@@ -11,7 +11,12 @@ public abstract class EventSet<E extends madnet.event.Event> implements IEventSe
 
     boolean closed = false;
 
-    protected boolean isClosed() { return closed; }
+    public boolean isEmpty() {
+        return events.size() == 0;
+    }
+
+    @Override
+    public boolean isOpen() { return !closed; };
 
     @Override
     public void close() {

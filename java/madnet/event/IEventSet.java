@@ -1,8 +1,12 @@
 package madnet.event;
 
 public interface IEventSet extends java.io.Closeable {
+    boolean isOpen();
+
     Iterable<? extends IEvent> events();
     Iterable<? extends IEvent> selections();
+
+    boolean isEmpty();
 
     IEventSet push(IEvent event) throws Exception;
     void pop(IEvent event);
@@ -11,5 +15,5 @@ public interface IEventSet extends java.io.Closeable {
     IEventSet selectIn(long milliseconds) throws Exception;
     IEventSet selectNow() throws Exception;
 
-    void interrupt();
+    void interrupt() throws Exception;
 }

@@ -39,8 +39,8 @@
   (.close x))
 
 
-(defmacro do-selections [[var selector] & body]
-  `(let [selections# (select ~selector)
+(defmacro do-selections [[var selector & options] & body]
+  `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)]
      (while (.hasNext iterator#)
        (let [~var (.next iterator#)]
@@ -48,10 +48,10 @@
        (.remove iterator#))
      nil))
 
-(defmacro for-selections [[var selector] & body]
-  `(let [selections# (select ~selector)
+(defmacro for-selections [[var selector & options] & body]
+  `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)
-         coll# (transient [])]
+         coll# (transient ~(or (:into (apply hash-map options)) []))]
      (while (.hasNext iterator#)
        (clojure.core/conj! coll# (.next iterator#))
        (.remove iterator#))

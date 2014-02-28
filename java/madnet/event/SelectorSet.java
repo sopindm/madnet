@@ -20,6 +20,16 @@ public class SelectorSet implements IEventSet {
     }
 
     @Override
+    public boolean isEmpty() {
+        return selector.keys().size() == 0;
+    }
+
+    @Override
+    public boolean isOpen() {
+        return selector.isOpen();
+    }
+
+    @Override
     public void close() throws java.io.IOException {
         for(IEvent e : events())
             ((Event)e).provider = null;
@@ -157,7 +167,8 @@ public class SelectorSet implements IEventSet {
     }
 
     @Override
-    public void interrupt() {
+    public void interrupt() throws Exception {
         selector.wakeup();
+        selectNow();
     }
 }
