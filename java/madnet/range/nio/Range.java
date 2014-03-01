@@ -6,29 +6,6 @@ public class Range extends madnet.range.Range {
     private int begin;
     private int end;
 
-    private boolean readable = true;
-    private boolean writeable = true;
-
-    @Override
-    public boolean readable() {
-        return readable;
-    }
-
-    @Override
-    public void closeRead() {
-        readable = false;
-    }
-
-    @Override
-    public boolean writeable() {
-        return writeable;
-    }
-
-    @Override
-    public void closeWrite() {
-        writeable = false;
-    }
-
     protected Buffer buffer;
 
     public Range(int begin, int end, Buffer buffer) throws Exception {

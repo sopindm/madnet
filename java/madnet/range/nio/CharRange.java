@@ -54,7 +54,7 @@ public class CharRange extends Range {
     }
 
     @Override
-    protected Result writeImpl(madnet.channel.IChannel ch) throws Exception {
+    public Result write(madnet.channel.IChannel ch) throws Exception {
         if(!(ch instanceof CharRange))
             return null;
 

@@ -1,6 +1,14 @@
 (ns madnet.channel
   (:refer-clojure :exclude [read])
-  (:import [madnet.channel IChannel Result]))
+  (:require [madnet.channel.pipe])
+  (:import [madnet.channel IChannel]
+           [madnet.event IEventSet]))
+
+(defn register [^IChannel ch ^IEventSet set]
+  (.register ch set))
+
+(defn events [^IChannel ch]
+  (.events ch))
 
 ;;
 ;; Reading/writing
@@ -30,7 +38,6 @@
     (read! read writen)
     [read writen]))
 
-
 (defn close! [^IChannel channel & options]
   (when (or (some #{:write} options) (empty? options))
     (.closeWrite channel))
@@ -38,60 +45,5 @@
     (.closeRead channel))
   channel)
 
-;;
-;; Pipes
-;;
+(def pipe madnet.channel.pipe/pipe)
 
-(deftype PipeReader [^java.nio.channels.Channel ch]
-  java.io.Closeable
-  (close [this] (.close ch))
-  IChannel
-  (clone [this] this)
-  (readable [this] (.isOpen ch))
-  (closeRead [this] (.close ch))
-  (writeable [this] false)
-  (closeWrite [this] this)
-  (read [this channel]
-    (when (instance? madnet.range.nio.ByteRange channel)
-      (let [buffer (.buffer channel)
-            begin (.position buffer)]
-        (.read ch (.buffer channel))
-        (Result. (- (.position buffer) begin)
-                 (- (.position buffer) begin))))))
-
-(deftype PipeWriter [ch]
-  java.io.Closeable
-  (close [this] (.close ch))
-  IChannel
-  (clone [this] this)
-  (readable [this] false)
-  (closeRead [this] this)
-  (writeable [this] (.isOpen ch))
-  (closeWrite [this] (.close ch))
-  (write [this channel]
-    (when (instance? madnet.range.nio.ByteRange channel)
-      (let [buffer (.buffer channel)
-            begin (.position buffer)]
-        (.write ch (.buffer channel))
-        (Result. (- (.position buffer) begin)
-                 (- (.position buffer) begin))))))
-
-(deftype Pipe [reader writer]
-  java.io.Closeable
-  (close [this] (.close reader) (.close writer))
-  IChannel
-  (clone [this] this)
-  (readable [this] (.readable reader))
-  (closeRead [this] (.closeRead reader))
-  (writeable [this] (.writeable writer))
-  (closeWrite [this] (.closeWrite writer))
-  (write [this channel]
-    (.write writer channel))
-  (read [this channel]
-    (.read reader channel)))
-
-(defn pipe ^madnet.channel.Pipe []
-  (let [pipe (java.nio.channels.Pipe/open)]
-    (.configureBlocking (.sink pipe) false)
-    (.configureBlocking (.source pipe) false)
-    (Pipe. (PipeReader. (.source pipe)) (PipeWriter. (.sink pipe)))))

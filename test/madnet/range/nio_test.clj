@@ -40,11 +40,8 @@
 
 (deftest closing-nio-range
   (let [r (nrange 0 10 (ByteBuffer/allocate 10))]
-    (c/close! r :read)
-    (?false (c/readable? r))
-    (?true (c/writeable? r))
-    (c/close! r :write)
-    (?false (c/writeable? r))))
+    (?throws (c/close! r :read) UnsupportedOperationException)
+    (?throws (c/close! r :write) UnsupportedOperationException)))
 
 ;;
 ;; byte range

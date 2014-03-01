@@ -131,9 +131,6 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         if(e == null)
             return;
 
-        if(e.provider() != this)
-            return;
-
         selections().add(e);
     }
 

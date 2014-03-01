@@ -33,11 +33,8 @@
 
 (deftest closing-circular-range
   (let [cr (crange 0 5 (irange 0 5))]
-    (c/close! cr :read)
-    (?false (c/readable? cr))
-    (?true (c/writeable? cr))
-    (c/close! cr :write)
-    (?false (c/writeable? cr))))
+    (?throws (c/close! cr :read) UnsupportedOperationException)
+    (?throws (c/close! cr :write) UnsupportedOperationException)))
 
 (deftest circular-range-operations
   (let [cr (crange 0 0 (irange -5 5))]

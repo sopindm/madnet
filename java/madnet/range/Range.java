@@ -2,6 +2,7 @@ package madnet.range;
 
 import madnet.channel.IChannel;
 import madnet.channel.Result;
+import madnet.channel.Events;
 
 abstract public class Range implements IChannel, Iterable
 {
@@ -12,6 +13,28 @@ abstract public class Range implements IChannel, Iterable
         if(begin > end)
             throw new IllegalArgumentException();
     }
+
+    @Override
+    public boolean readable() { return true; }
+    
+    @Override
+    public boolean writeable() { return true; }
+
+    @Override
+    public void closeRead() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void closeWrite() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Events events() { return Events.EMPTY; }
+
+    @Override
+    public void register(madnet.event.IEventSet set) {}
 
     public Range clone() throws CloneNotSupportedException {
         return (Range)super.clone();
@@ -58,29 +81,15 @@ abstract public class Range implements IChannel, Iterable
     public Range expand(int n) throws Exception {
         return end(end() + n);
     }
-
-    protected Result writeImpl(IChannel ch) throws Exception {
-        return null;
-    }
-
-    protected Result readImpl(IChannel ch) throws Exception {
+    
+    @Override
+    public Result write(IChannel ch) throws Exception {
         return null;
     }
 
     @Override
-    public final Result write(IChannel ch) throws Exception {
-        if(!writeable() || !ch.readable())
-            throw new java.nio.channels.ClosedChannelException();
-
-        return writeImpl(ch);
-    }
-
-    @Override
-    public final Result read(IChannel ch) throws Exception {
-        if(!readable() || !ch.writeable())
-            throw new java.nio.channels.ClosedChannelException();
-
-        return readImpl(ch);
+    public Result read(IChannel ch) throws Exception {
+        return null;
     }
 
     @Override

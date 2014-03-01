@@ -23,19 +23,13 @@
   (let [r (irange 0 10)]
     (?true (c/readable? r))
     (?true (c/writeable? r))
-    (c/close! r)
-    (?false (c/readable? r))
-    (?false (c/writeable? r))))
+    (?throws (c/close! r) UnsupportedOperationException)))
 
 (deftest range-read-and-write
   (?throws (c/read! (irange 0 1) (irange 5 10))
            UnsupportedOperationException)
   (?throws (c/write! (irange 2 10) (irange 5 10))
-           UnsupportedOperationException)
-  (?throws (c/write! (c/close! (irange 0 10) :write) (irange 0 10))
-           java.nio.channels.ClosedChannelException)
-  (?throws (c/read! (c/close! (irange 0 10) :read) (irange 0 10))
-           java.nio.channels.ClosedChannelException))
+           UnsupportedOperationException))
 
 (deftest range-mutable-take-drop-and-expand
   (let [r (irange 5 10)]
@@ -98,9 +92,9 @@
            [begin end]
       (seq [] (seq (->> @coll (take (.end ^IntegerRange this)) (drop (.begin ^IntegerRange this)))))
       (count [] (r/size this))
-      (writeImpl [src] (writer this src))
-      (readImpl [ts] nil)
-      (iterator [] (.iterator ^Iterable (seq this))))))
+      (write [src] (writer this src))
+      (read [ts] nil)
+      (iterator [] (.iterator (or (seq this) []))))))
 
 (defn another-range ^ProxyRange [begin end coll]
   (let [range (srange begin end coll)]

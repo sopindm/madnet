@@ -26,7 +26,8 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
         @Override
         public void start() {
-            provider().triggered.add(this);
+            if(provider() != null)
+                provider().triggered.add(this);
         }
 
         @Override
@@ -86,8 +87,8 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
         if(e == null)
             return;
 
-        if(e.provider() != this)
-            return;
+        //if(e.provider() != this)
+        //return;
 
         selections().add(e);
     }

@@ -25,16 +25,7 @@
         pr (r/proxy r)]
     (?true (c/readable? pr))
     (?true (c/writeable? pr))
-    (c/close! r)
-    (?false (c/readable? pr))
-    (?false (c/writeable? pr)))
-  (let [r (irange 0 10)
-        pr (r/proxy r)]
-    (c/close! pr)
-    (?false (c/readable? r))
-    (?false (c/readable? pr))
-    (?false (c/writeable? r))
-    (?false (c/writeable? pr))))
+    (?throws (c/close! r) UnsupportedOperationException)))
 
 (deftest range-proxy-operations
   (let [pr (r/proxy (irange 0 10))]
@@ -51,11 +42,11 @@
 
 (deftest range-proxy-read-and-write
   (let [writeable (proxy [IntegerRange] [0 10]
-                    (writeImpl [seq] (throw (UnsupportedOperationException.
-                                             "Writing to proxies is OK"))))
+                    (write [seq] (throw (UnsupportedOperationException.
+                                         "Writing to proxies is OK"))))
         readable (proxy [IntegerRange] [0 10]
-                   (readImpl [seq] (throw (UnsupportedOperationException.
-                                           "Reading from proxies is OK"))))
+                   (read [seq] (throw (UnsupportedOperationException.
+                                       "Reading from proxies is OK"))))
         wp (r/proxy writeable)
         rp (r/proxy readable)
         range (IntegerRange. 0 10)]
@@ -70,8 +61,8 @@
 
 (deftest read-only-and-write-only-proxies
   (let [r (proxy [IntegerRange] [0 10]
-            (writeImpl [seq] (Result. 0 0))
-            (readImpl [seq] (Result. 1 1)))
+            (write [seq] (Result. 0 0))
+            (read [seq] (Result. 1 1)))
         rp (r/proxy r :read-only)
         wp (r/proxy r :write-only)]
     (?= (c/read! rp wp) (Result. 1 1))

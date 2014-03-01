@@ -5,29 +5,6 @@ public class IntegerRange extends Range
     private int begin;
     private int end;
 
-    private boolean readable = true;
-    private boolean writeable = true;
-
-    @Override
-    public boolean readable() {
-        return readable;
-    }
-
-    @Override
-    public void closeRead() {
-        readable = false;
-    }
-
-    @Override
-    public boolean writeable() {
-        return writeable;
-    }
-
-    @Override
-    public void closeWrite() {
-        writeable = false;
-    }
-
     public IntegerRange(int begin, int end) {
         super(begin, end);
         

@@ -15,9 +15,6 @@
     (e/start! t)
     (?= (seq (e/select s)) [t])))
 
-(deftest touching-no-registered-trigger
-  (?throws (e/start! (e/trigger)) NullPointerException))
-
 (deftest touching-trigger-twice-has-no-effect
   (let [t (e/trigger)
         s (e/trigger-set t)]
@@ -151,7 +148,6 @@
     (?= (.provider t) nil)
     (e/select s :timeout 0)
     (?= (seq (e/events s)) nil)
-    (?= (seq (.selections s)) nil)
     (?= (e/attachment t) nil)))
 
 (deftest errors-adding-trigger
