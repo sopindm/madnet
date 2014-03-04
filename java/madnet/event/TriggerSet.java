@@ -7,17 +7,17 @@ import java.util.HashSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public class TriggerSet extends EventSet<TriggerSet.Event> {
-    LinkedBlockingQueue<Event> triggered = new LinkedBlockingQueue<Event>();
+public class TriggerSet extends SignalSet<TriggerSet.Signal> {
+    LinkedBlockingQueue<Signal> triggered = new LinkedBlockingQueue<Signal>();
 
-    public static class Event extends madnet.event.Event {
+    public static class Signal extends madnet.event.Signal {
         @Override
         public TriggerSet provider() { 
             return (TriggerSet)super.provider();
         }
 
         @Override
-        public void register(IEventSet provider) throws Exception {
+        public void register(ISignalSet provider) throws Exception {
             super.register(provider);
 
             if(!(this.provider instanceof TriggerSet))
@@ -41,8 +41,8 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
 
     @Override
     public void close() {
-        for(Event e : events())
-            e.cancelProvider();
+        for(Signal s : signals())
+            s.cancelProvider();
 
         triggered.clear();
 
@@ -50,40 +50,40 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
     }
 
     @Override
-    public TriggerSet push(IEvent event) {
+    public TriggerSet push(ISignal signal) {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        if(!(event instanceof Event))
+        if(!(signal instanceof Signal))
             throw new IllegalArgumentException();
 
-        events().add((Event)event);
+        signals().add((Signal)signal);
         return this;
     }
 
     @Override
-    public void pop(IEvent event) {
+    public void pop(ISignal signal) {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        if(!(event instanceof Event))
+        if(!(signal instanceof Signal))
             throw new IllegalArgumentException();
 
-        canceling.add((Event)event);
+        canceling.add((Signal)signal);
     }
 
-    private void cancelEvents() {
+    private void cancelSignals() {
         while(!canceling.isEmpty()) {
-            Event e = canceling.poll();
+            Signal s = canceling.poll();
 
-            if(e != null) {
-                events().remove(e);
-                selections().remove(e);
+            if(s != null) {
+                signals().remove(s);
+                selections().remove(s);
             }
         }
     }
 
-    private void pushSelection(Event e) {
+    private void pushSelection(Signal e) {
         if(e == null)
             return;
 
@@ -100,9 +100,9 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
-        if(selections().size() == 0 && events.size() > 0) {
+        if(selections().size() == 0 && signals.size() > 0) {
             try {
                 selectionThread = Thread.currentThread();
                 pushSelection(triggered.take());
@@ -123,9 +123,9 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
-        if(selections().size() == 0 && events.size() > 0) {
+        if(selections().size() == 0 && signals.size() > 0) {
             try {
                 selectionThread = Thread.currentThread();
                 pushSelection(triggered.poll(milliseconds, TimeUnit.MILLISECONDS));
@@ -146,7 +146,7 @@ public class TriggerSet extends EventSet<TriggerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
         while(triggered.size() > 0) {
             pushSelection(triggered.poll());

@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.concurrent.TimeUnit;
 
-public class TimerSet extends EventSet<TimerSet.Event> {
-    SortedMap<Long, LinkedList<Event>> timeouts = new java.util.TreeMap<Long, LinkedList<Event>>();
+public class TimerSet extends SignalSet<TimerSet.Signal> {
+    SortedMap<Long, LinkedList<Signal>> timeouts = new java.util.TreeMap<Long, LinkedList<Signal>>();
 
     public Long timeout() {
         if(timeouts.size() == 0)
@@ -17,11 +17,11 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         return timeouts.firstKey() - System.currentTimeMillis();
     }
 
-    public static class Event extends madnet.event.Event {
+    public static class Signal extends madnet.event.Signal {
         long timeout;
         long finishStamp = 0;
 
-        public Event(long millisecondsTimeout) {
+        public Signal(long millisecondsTimeout) {
             timeout = millisecondsTimeout;
         }
 
@@ -39,7 +39,7 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         }
 
         @Override
-        public void register(IEventSet provider) throws Exception {
+        public void register(ISignalSet provider) throws Exception {
             super.register(provider);
 
             if(!(this.provider instanceof TimerSet))
@@ -50,10 +50,10 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         public void start() {
             finishStamp = System.currentTimeMillis() + timeout;
 
-            LinkedList<Event> entry = provider().timeouts.get(finishStamp);
+            LinkedList<Signal> entry = provider().timeouts.get(finishStamp);
 
             if(entry == null) {
-                entry = new LinkedList<Event>();
+                entry = new LinkedList<Signal>();
                 provider().timeouts.put(finishStamp, entry);
             }
 
@@ -68,14 +68,14 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
         @Override
         public void stop() {
-            LinkedList<Event> event = provider().timeouts.get(finishStamp);
-            if(event == null)
+            LinkedList<Signal> signal = provider().timeouts.get(finishStamp);
+            if(signal == null)
                 return;
 
-            if(event.size() == 1)
+            if(signal.size() == 1)
                 provider().timeouts.remove(finishStamp);
             else
-                event.remove(this);
+                signal.remove(this);
 
             finishStamp = 0;
         }
@@ -87,51 +87,51 @@ public class TimerSet extends EventSet<TimerSet.Event> {
 
     @Override
     public void close() {
-        for(Event e : events())
+        for(Signal e : signals())
             e.cancelProvider();
 
         super.close();
     }
 
     @Override
-    public TimerSet push(IEvent event) {
+    public TimerSet push(ISignal signal) {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        if(!(event instanceof Event))
+        if(!(signal instanceof Signal))
             throw new IllegalArgumentException();
 
-        events().add((Event)event);
+        signals().add((Signal)signal);
         return this;
     }
 
     @Override
-    public void pop(IEvent event) {
+    public void pop(ISignal signal) {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        if(!(event instanceof Event))
+        if(!(signal instanceof Signal))
             throw new IllegalArgumentException();
 
-        canceling.add((Event)event);
+        canceling.add((Signal)signal);
     }
 
-    private void cancelEvents() {
+    private void cancelSignals() {
         while(!canceling.isEmpty()) {
-            Event e = canceling.poll();
+            Signal s = canceling.poll();
 
-            if(e != null) {
-                events().remove(e);
-                selections().remove(e);
+            if(s != null) {
+                signals().remove(s);
+                selections().remove(s);
             }
         }
     }
 
-    private void pushSelection(Event e) {
-        if(e == null)
+    private void pushSelection(Signal s) {
+        if(s == null)
             return;
 
-        selections().add(e);
+        selections().add(s);
     }
 
     Thread selectionThread = null;
@@ -141,11 +141,11 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
         long timestamp = System.currentTimeMillis();
 
-        if(selections().size() == 0 && events.size() > 0 && timeouts.size() > 0
+        if(selections().size() == 0 && signals().size() > 0 && timeouts.size() > 0
            && timeouts.firstKey() > timestamp) {
             try {
                 selectionThread = Thread.currentThread();
@@ -167,11 +167,11 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
         long timestamp = System.currentTimeMillis();
 
-        if(selections().size() == 0 && events.size() > 0 && timeouts.size() > 0
+        if(selections().size() == 0 && signals().size() > 0 && timeouts.size() > 0
            && timeouts.firstKey() > timestamp) {
             try {
                 selectionThread = Thread.currentThread();
@@ -193,17 +193,17 @@ public class TimerSet extends EventSet<TimerSet.Event> {
         if(!isOpen())
             throw new ClosedSelectorException();
 
-        cancelEvents();
+        cancelSignals();
 
         long timestamp = System.currentTimeMillis();
 
-        Iterator<Map.Entry<Long, LinkedList<Event>>> iterator = timeouts.entrySet().iterator();
+        Iterator<Map.Entry<Long, LinkedList<Signal>>> iterator = timeouts.entrySet().iterator();
 
         while(iterator.hasNext()) {
-            Map.Entry<Long, LinkedList<Event>> entry = iterator.next();
+            Map.Entry<Long, LinkedList<Signal>> entry = iterator.next();
 
             if(entry.getKey() <= timestamp) {
-                for(Event e : entry.getValue())
+                for(Signal e : entry.getValue())
                     selections().add(e);
 
                 iterator.remove();

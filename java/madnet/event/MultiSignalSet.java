@@ -3,14 +3,14 @@ package madnet.event;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MultiEventSet implements IEventSet {
+public class MultiSignalSet implements ISignalSet {
     final TriggerSet triggers;
     final TimerSet timers;
     final SelectorSet selectors;
 
     final ExecutorService executor;
 
-    public MultiEventSet() throws Exception {
+    public MultiSignalSet() throws Exception {
         triggers =  new TriggerSet();
         timers = new TimerSet();
         selectors = new SelectorSet();
@@ -40,39 +40,39 @@ public class MultiEventSet implements IEventSet {
     }
 
     @Override
-    public Iterable<IEvent> events() {
-        return new madnet.util.MultiIterable<IEvent>(triggers.events(),
-                                                     timers.events(),
-                                                     selectors.events());
+    public Iterable<ISignal> signals() {
+        return new madnet.util.MultiIterable<ISignal>(triggers.signals(),
+                                                      timers.signals(),
+                                                      selectors.signals());
     }
 
     @Override
-    public Iterable<IEvent> selections() {
-        return new madnet.util.MultiIterable<IEvent>(triggers.selections(),
+    public Iterable<ISignal> selections() {
+        return new madnet.util.MultiIterable<ISignal>(triggers.selections(),
                                                      timers.selections(),
                                                      selectors.selections());
     }
 
     @Override
-    public IEventSet push(IEvent event) throws Exception {
-        if(event instanceof TriggerSet.Event)
-            return triggers.push(event);
+    public ISignalSet push(ISignal signal) throws Exception {
+        if(signal instanceof TriggerSet.Signal)
+            return triggers.push(signal);
 
-        if(event instanceof TimerSet.Event)
-            return timers.push(event);
+        if(signal instanceof TimerSet.Signal)
+            return timers.push(signal);
 
-        if(event instanceof SelectorSet.Event)
-            return selectors.push(event);
+        if(signal instanceof SelectorSet.Signal)
+            return selectors.push(signal);
 
         throw new IllegalArgumentException();
     }
 
     @Override
-    public void pop(IEvent event) {
+    public void pop(ISignal signal) {
         throw new UnsupportedOperationException();
     }
 
-    MultiEventSet selectImpl() throws Exception {
+    MultiSignalSet selectImpl() throws Exception {
         if(selectors.isEmpty()) {
             triggers.select();
         }
@@ -98,7 +98,7 @@ public class MultiEventSet implements IEventSet {
     }
 
     @Override
-    public MultiEventSet select() throws Exception {
+    public MultiSignalSet select() throws Exception {
         Long timeout = timers.timeout();
 
         if(timeout != null) {
@@ -111,7 +111,7 @@ public class MultiEventSet implements IEventSet {
         return selectImpl();
     }
 
-    MultiEventSet selectInImpl(final long timeout) throws Exception {
+    MultiSignalSet selectInImpl(final long timeout) throws Exception {
         if(triggers.isEmpty()) {
             selectors.selectIn(timeout);
         }
@@ -140,7 +140,7 @@ public class MultiEventSet implements IEventSet {
     }
 
     @Override
-    public MultiEventSet selectIn(long milliseconds) throws Exception {
+    public MultiSignalSet selectIn(long milliseconds) throws Exception {
         Long timeout = timers.timeout();
 
         if(timeout != null)
@@ -150,7 +150,7 @@ public class MultiEventSet implements IEventSet {
     }
 
     @Override
-    public MultiEventSet selectNow() throws Exception {
+    public MultiSignalSet selectNow() throws Exception {
         timers.selectNow();
         triggers.selectNow();
         selectors.selectNow();

@@ -2,7 +2,7 @@
   (:require [khazad-dum :refer :all]
             [madnet.event :as e])
   (:import [java.nio.channels ClosedSelectorException]
-           [madnet.event Event EventSet]))
+           [madnet.event Signal SignalSet]))
 
 ;;
 ;; Triggers
@@ -69,13 +69,6 @@
     (e/conj! (e/trigger-set) t)
     (?throws (e/conj! (e/trigger-set) t) IllegalArgumentException)))
 
-(deftest triggers-attachment
-  (let [t (e/trigger 42)]
-    (?= (e/attachment t) 42))
-  (let [t (e/trigger)]
-    (e/attach! t 123)
-    (?= (e/attachment t) 123)))
-    
 (deftest selecting-tirgger-now
   (let [s (e/trigger-set)]
     (?= (seq (e/select s :timeout 0)) nil)
@@ -119,12 +112,12 @@
         s (e/trigger-set t1 t2)]
     (e/cancel t1)
     (e/select s :timeout 0)
-    (?= (set (e/events s)) #{t2})
+    (?= (set (e/signals s)) #{t2})
     (let [f (future (e/select s :timeout 4))]
       (Thread/sleep 2)
       (e/cancel t2)
       (?= (set @f) #{})
-      (?= (set (e/events s)) #{}))))
+      (?= (set (e/signals s)) #{}))))
 
 (deftest closing-trigger-provider
   (let [t (e/trigger)
@@ -132,7 +125,7 @@
     (e/start! t)
     (.close s)
     (?= (.provider t) nil)
-    (?= (seq (e/events s)) nil)
+    (?= (seq (e/signals s)) nil)
     (?= (seq (.selections s)) nil)
     (?throws (e/select s) ClosedSelectorException)
     (?throws (e/select s :timeout 0) ClosedSelectorException)
@@ -140,21 +133,20 @@
     (?throws (e/conj! s t) ClosedSelectorException)))
 
 (deftest closing-tirgger-event
-  (let [t (e/trigger 123)
+  (let [t (e/trigger)
         s (e/trigger-set t)]
     (?= (.provider t) s)
     (e/start! t)
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
-    (?= (seq (e/events s)) nil)
-    (?= (e/attachment t) nil)))
+    (?= (seq (e/signals s)) nil)))
 
 (deftest errors-adding-trigger
   (let [t (e/trigger)
         s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) t)
+    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
              IllegalArgumentException)))
 
 (deftest trigger-set-without-events-doesnt-block
@@ -170,8 +162,8 @@
 (deftest errors-adding-trigger
   (let [t (e/trigger)
         s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) t)
+    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
              IllegalArgumentException)))
 
 ;;
@@ -182,7 +174,7 @@
   (let [t (e/timer 0)
         s (e/timer-set)]
     (e/conj! s t)
-    (?= (seq (e/events s)) [t])
+    (?= (seq (e/signals s)) [t])
     (e/start! t)
     (?= (seq (e/select s)) [t])))
     
@@ -241,7 +233,7 @@
     (e/cancel t)
     (?= (seq (e/select s)) nil)
     (?= (.provider t) nil)
-    (?= (seq (e/events s)) nil)
+    (?= (seq (e/signals s)) nil)
     (?= (seq (.selections s)) nil))
   (let [t (e/timer 4)
         t2 (e/timer 5)
@@ -257,18 +249,13 @@
       (Thread/sleep 2)
       (e/cancel t)
       (?= (seq @f) nil)
-      (?= (seq (e/events s)) nil))))
+      (?= (seq (e/signals s)) nil))))
 
 (deftest setting-timer-timeout
   (let [t (e/timer 123)]
     (?= (.timeout t) 123)
     (.setTimeout t 456)
     (?= (.timeout t) 456)))
-
-(deftest timer-attachment
-  (let [t (e/timer 123 :some-attachment)]
-    (?= (.timeout t) 123)
-    (?= (e/attachment t) :some-attachment)))
 
 (deftest interrupting-timer
   (letfn [(?interrupt [set future]
@@ -288,7 +275,7 @@
     (e/start! t)
     (.close s)
     (?= (.provider t) nil)
-    (?= (seq (e/events s)) nil)
+    (?= (seq (e/signals s)) nil)
     (?= (seq (.selections s)) nil)
     (?throws (e/select s) ClosedSelectorException)
     (?throws (e/select s :timeout 0) ClosedSelectorException)
@@ -302,15 +289,14 @@
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
-    (?= (seq (e/events s)) nil)
-    (?= (seq (.selections s)) nil)
-    (?= (e/attachment t) nil)))
+    (?= (seq (e/signals s)) nil)
+    (?= (seq (.selections s)) nil)))
 
 (deftest errors-adding-timer
   (let [t (e/timer 123)
         s (e/timer-set)]
-    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) t)
+    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
              IllegalArgumentException)))
 
 ;;
@@ -372,7 +358,7 @@
     (.write writer (java.nio.ByteBuffer/wrap (byte-array (map byte (range 10)))))
     (e/cancel we)
     (?= (seq (e/select s)) [re])
-    (?= (seq (e/events s)) [re])
+    (?= (seq (e/signals s)) [re])
     (?= (.provider we) nil)))
 
 (deftest closing-selector-set
@@ -381,37 +367,28 @@
     (.close s)
     (?= (.provider re) nil)
     (?= (.provider we) nil)
-    (?= (seq (e/events s)) nil)
+    (?= (seq (e/signals s)) nil)
     (?= (seq (.selections s)) nil)
     (?throws (e/select s) ClosedSelectorException)
     (?throws (e/select s :timeout 0) ClosedSelectorException)
     (?throws (e/select s :timeout 10) ClosedSelectorException)
     (?throws (e/conj! s we) ClosedSelectorException)))
 
-(deftest selector-attachments
-  (let [[reader writer] (pipe-)
-        e (e/selector reader :read)]
-    (?= (e/attachment e) nil)
-    (e/attach! e 123)
-    (?= (e/attachment e) 123)))
-
 (deftest errors-adding-selector
   (let [e (e/selector (first (pipe-)) :read)
         s (e/selector-set)]
-    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [EventSet] [] (push [event] nil)) e)
+    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) e)
              IllegalArgumentException)))
 
 (deftest closing-event
   (let [[reader _] (pipe-)
         e (e/selector reader :read)
         s (e/selector-set e)]
-    (e/attach! e 123)
     (.close e)
     (e/select s :timeout 0)
-    (?= (e/attachment e) nil)
     (?= (.provider e) nil)
-    (?= (seq (e/events s)) nil)))
+    (?= (seq (e/signals s)) nil)))
 
 (deftest accept-event
   (let [accept-ch (java.nio.channels.ServerSocketChannel/open)]
@@ -446,11 +423,11 @@
 
 (deftest making-multiset
   (with-events [trigger [timer 123] [reader writer] s]
-    (?= (set (e/events s)) #{trigger timer reader writer})
-    (?= (-> s .triggers e/events seq) [trigger])
-    (?= (-> s .timers e/events seq) [timer])
-    (?= (-> s .selectors e/events set) #{reader writer})
-    (?throws (e/conj! s (proxy [Event] [])) IllegalArgumentException)))
+    (?= (set (e/signals s)) #{trigger timer reader writer})
+    (?= (-> s .triggers e/signals seq) [trigger])
+    (?= (-> s .timers e/signals seq) [timer])
+    (?= (-> s .selectors e/signals set) #{reader writer})
+    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)))
 
 (deftest selecting-on-multiset-with-trigger
   (with-events [trigger [timer 1000] [selector _] s]

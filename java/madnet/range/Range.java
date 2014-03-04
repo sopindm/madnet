@@ -34,7 +34,7 @@ abstract public class Range implements IChannel, Iterable
     public Events events() { return Events.EMPTY; }
 
     @Override
-    public void register(madnet.event.IEventSet set) {}
+    public void register(madnet.event.ISignalSet set) {}
 
     public Range clone() throws CloneNotSupportedException {
         return (Range)super.clone();

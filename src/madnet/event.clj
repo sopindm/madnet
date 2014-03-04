@@ -1,25 +1,19 @@
 (ns madnet.event
   (:refer-clojure :exclude [conj!])
   (:require [clojure.set :as s])
-  (:import [madnet.event TriggerEvent TriggerSet TimerEvent TimerSet SelectorEvent SelectorSet]
+  (:import [madnet.event TriggerSignal TriggerSet TimerSignal TimerSet SelectorSignal SelectorSet]
            [java.nio.channels SelectionKey]))
 
 ;;
 ;; Abstract events and sets
 ;;
 
-(defn attach! [event attachment]
-  (.attach event attachment))
-
-(defn attachment [event]
-  (.attachment event))
-
 (defn conj! [set event]
   (.register event set)
   set)
 
-(defn events [set]
-  (.events set))
+(defn signals [set]
+  (.signals set))
 
 (defn select [set & {:as options}]
   (let [timeout (:timeout options)
@@ -64,7 +58,7 @@
   (doall (map #(.stop %) events)))
 
 (defn event-set [& events]
-  (reduce conj! (madnet.event.MultiEventSet.) events))
+  (reduce conj! (madnet.event.MultiSignalSet.) events))
 
 ;;
 ;; Trigger events and sets
@@ -73,16 +67,15 @@
 (defn trigger-set [& triggers]
   (reduce conj! (TriggerSet.) triggers))
 
-(defn trigger
-  ([] (TriggerEvent.))
-  ([attachment] (doto (TriggerEvent.) (attach! attachment))))
+(defn trigger []
+  (TriggerSignal.))
 
 ;;
 ;; Timer events
 ;;
 
 (defn timer
-  ([milliseconds] (TimerEvent. milliseconds))
+  ([milliseconds] (TimerSignal. milliseconds))
   ([milliseconds attachment] (doto (timer milliseconds) (attach! attachment))))
 
 (defn timer-set [& timers]
@@ -105,7 +98,7 @@
       (check-option :read java.nio.channels.ReadableByteChannel)
       (check-option :accept java.nio.channels.ServerSocketChannel)
       (check-option :connect java.nio.channels.SocketChannel))
-    (SelectorEvent. channel op-code)))
+    (SelectorSignal. channel op-code)))
 
 (defn selector-set [& events]
   (reduce conj! (SelectorSet.) events))

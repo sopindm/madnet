@@ -6,17 +6,17 @@ import java.nio.channels.SelectableChannel;
 import java.util.Iterator;
 import java.util.Set;
 
-public class SelectorSet implements IEventSet {
+public class SelectorSet implements ISignalSet {
     Selector selector;
 
-    EventIterable events;
-    EventIterable selections;
+    SignalIterable signals;
+    SignalIterable selections;
 
     public SelectorSet() throws Exception {
         selector = Selector.open();
 
-        events = new EventIterable(selector.keys());
-        selections = new EventIterable(selector.selectedKeys());
+        signals = new SignalIterable(selector.keys());
+        selections = new SignalIterable(selector.selectedKeys());
     }
 
     @Override
@@ -31,30 +31,30 @@ public class SelectorSet implements IEventSet {
 
     @Override
     public void close() throws java.io.IOException {
-        for(IEvent e : events())
-            ((Event)e).provider = null;
+        for(ISignal e : signals())
+            ((Signal)e).provider = null;
 
         selector.close();
     }
 
-    private static class EventIterable implements Iterable<IEvent> {
+    private static class SignalIterable implements Iterable<ISignal> {
         Set<SelectionKey> source;
 
-        public EventIterable(Set<SelectionKey> source) {
+        public SignalIterable(Set<SelectionKey> source) {
             this.source = source;
         }
 
         @Override
-        public Iterator<IEvent> iterator() {
+        public Iterator<ISignal> iterator() {
             final Iterator<SelectionKey> iterator = source.iterator();
 
-            return new Iterator<IEvent>() {
+            return new Iterator<ISignal>() {
                 @Override
                 public boolean hasNext() { return iterator.hasNext(); }
 
                 @Override
-                public IEvent next() {
-                    return (IEvent)iterator.next().attachment();
+                public ISignal next() {
+                    return (ISignal)iterator.next().attachment();
                 }
 
                 @Override
@@ -64,12 +64,12 @@ public class SelectorSet implements IEventSet {
     }
 
     @Override
-    public Iterable<IEvent> events() { return events; };
+    public Iterable<ISignal> signals() { return signals; };
 
     @Override
-    public Iterable<IEvent> selections() { return selections; };
+    public Iterable<ISignal> selections() { return selections; };
 
-    public static class Event implements IEvent {
+    public static class Signal implements ISignal {
         SelectableChannel channel = null;
         int op;
         SelectionKey key = null;
@@ -79,13 +79,13 @@ public class SelectorSet implements IEventSet {
         @Override
         public SelectorSet provider() { return provider; }
 
-        public Event(SelectableChannel channel, int op) {
+        public Signal(SelectableChannel channel, int op) {
             this.channel = channel;
             this.op = op;
         }
 
         @Override
-        public void register(IEventSet set) throws Exception {
+        public void register(ISignalSet set) throws Exception {
             if(provider != null)
                 throw new IllegalArgumentException();
 
@@ -102,7 +102,6 @@ public class SelectorSet implements IEventSet {
 
         @Override
         public void close() {
-            attachment = null;
             cancel();
         }
 
@@ -121,31 +120,19 @@ public class SelectorSet implements IEventSet {
         public void stop() {
             key.interestOps(0);
         }
-
-        Object attachment;
-
-        @Override
-        public void attach(Object attachment) {
-            this.attachment = attachment;
-        }
-
-        @Override
-        public Object attachment() { 
-            return attachment;
-        }
     }
 
     @Override
-    public SelectorSet push(IEvent event) throws Exception {
-        if(!(event instanceof Event))
+    public SelectorSet push(ISignal signal) throws Exception {
+        if(!(signal instanceof Signal))
             throw new IllegalArgumentException();
 
-        ((Event)event).register(selector);
+        ((Signal)signal).register(selector);
         return this;
     }
 
     @Override
-    public void pop(IEvent event) {
+    public void pop(ISignal signal) {
     }
 
     @Override

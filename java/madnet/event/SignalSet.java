@@ -4,15 +4,15 @@ import java.util.AbstractSet;
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public abstract class EventSet<E extends madnet.event.Event> implements IEventSet {
-    HashSet<E> events = new HashSet<E>();
+public abstract class SignalSet<E extends madnet.event.Signal> implements ISignalSet {
+    HashSet<E> signals = new HashSet<E>();
     HashSet<E> selections = new HashSet<E>();
     protected ConcurrentLinkedQueue<E> canceling = new ConcurrentLinkedQueue<E>();
 
     boolean closed = false;
 
     public boolean isEmpty() {
-        return events.size() == 0;
+        return signals.size() == 0;
     }
 
     @Override
@@ -20,7 +20,7 @@ public abstract class EventSet<E extends madnet.event.Event> implements IEventSe
 
     @Override
     public void close() {
-        events.clear();
+        signals.clear();
         selections.clear();
         canceling.clear();
 
@@ -28,8 +28,8 @@ public abstract class EventSet<E extends madnet.event.Event> implements IEventSe
     }
 
     @Override
-    public AbstractSet<E> events() {
-        return events;
+    public AbstractSet<E> signals() {
+        return signals;
     }
 
     @Override

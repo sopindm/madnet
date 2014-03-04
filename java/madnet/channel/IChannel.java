@@ -8,7 +8,7 @@ public interface IChannel extends Cloneable {
     void closeWrite();
 
     public Events events();
-    void register(madnet.event.IEventSet set);
+    void register(madnet.event.ISignalSet set);
 
     public IChannel clone() throws CloneNotSupportedException;
 
