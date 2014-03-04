@@ -573,5 +573,12 @@
       (signal!)
       (?= @a [event]))))
 
-;event combinators
+(deftest or-event-test
+  (let [a (atom [])]
+    (with-handler [event (e/event (constantly true))
+                   event1 (e/event (constantly true) event)
+                   event2 (e/event (constantly true) event)
+                   or-event (e/event #(swap! a conj %) event1 event2)]
+      (signal!)
+      (?= (set @a) #{event1 event2}))))
     
