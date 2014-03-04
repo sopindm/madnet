@@ -2,7 +2,7 @@
   (:require [khazad-dum :refer :all]
             [madnet.event :as e])
   (:import [java.nio.channels ClosedSelectorException]
-           [madnet.event Signal SignalSet]))
+           [madnet.event Signal SignalSet IEventHandler]))
 
 ;;
 ;; Triggers
@@ -531,3 +531,47 @@
         s (e/event-set t1 t2)]
     (e/start! t1 t2)
     (?= (e/for-selections [e s :into #{}]) #{t1 t2})))
+
+;;
+;; Handlers
+;;
+
+(defmacro with-handler [[handler expr & more-vars] & body]
+  `(let [~handler ~expr
+         ~@more-vars
+         ~'signal (e/trigger ~handler)
+         set# (e/event-set ~'signal)
+         ~'signal! (fn []
+                     (e/start! ~'signal)
+                     (e/do-selections [event# set#] (e/handle! event#)))]
+     ~@body))
+
+(deftest handling-signals
+  (let [a (atom [])]
+    (with-handler [handler (reify IEventHandler
+                             (onCallback [this event] (swap! a conj event)))]
+      (signal!)
+      (?= @a [signal])))
+  (let [a (atom [])]
+    (with-handler [handler (e/handler #(swap! a conj %))]
+      (signal!)
+      (?= @a [signal])))
+  (let [a (atom [])]
+    (with-handler [handler (e/handler #(swap! a conj %))]
+      (let [handler (e/handler #(swap! a conj %) signal)]
+        (signal!)
+        (?= @a [signal signal])))))
+
+(deftest simple-events
+  (let [a (atom [])]
+    (with-handler [event (e/event #(swap! a conj %))]
+      (signal!)
+      (?= @a [signal])))
+  (let [a (atom [])]
+    (with-handler [event (e/event (constantly true))
+                   event2 (e/event #(swap! a conj %) event)]
+      (signal!)
+      (?= @a [event]))))
+
+;event combinators
+    

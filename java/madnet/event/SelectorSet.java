@@ -69,7 +69,7 @@ public class SelectorSet implements ISignalSet {
     @Override
     public Iterable<ISignal> selections() { return selections; };
 
-    public static class Signal implements ISignal {
+    public static class Signal extends AEvent implements ISignal {
         SelectableChannel channel = null;
         int op;
         SelectionKey key = null;
@@ -98,6 +98,12 @@ public class SelectorSet implements ISignalSet {
         private void register(Selector selector) throws Exception {
             key = channel.register(selector, 0);
             key.attach(this);
+        }
+
+        @Override
+        public void handle() {
+            for(IEventHandler h : handlers())
+                h.onCallback(this);
         }
 
         @Override

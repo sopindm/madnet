@@ -1,7 +1,8 @@
 (ns madnet.event
   (:refer-clojure :exclude [conj!])
   (:require [clojure.set :as s])
-  (:import [madnet.event TriggerSignal TriggerSet TimerSignal TimerSet SelectorSignal SelectorSet]
+  (:import [madnet.event TriggerSignal TriggerSet TimerSignal TimerSet SelectorSignal SelectorSet
+                         IEventHandler AEvent]
            [java.nio.channels SelectionKey]))
 
 ;;
@@ -52,13 +53,37 @@
      (persistent! coll#)))
 
 (defn start! [& events]
-  (doall (map #(.start %) events)))
+  (doseq [e events] (.start e)))
 
 (defn stop! [& events]
-  (doall (map #(.stop %) events)))
+  (doseq [e events] (.stop e)))
+
+(defn handle! [& events]
+  (doseq [e events] (.handle e)))
 
 (defn event-set [& events]
   (reduce conj! (madnet.event.MultiSignalSet.) events))
+
+(defn- push-handler- [signal handler]
+  (.pushHandler signal handler)
+  signal)
+
+(defn- push-signal- [handler signal]
+  (.pushHandler signal handler)
+  handler)
+
+(defn handler
+  ([f] (reify IEventHandler (onCallback [this event] (f event))))
+  ([f & signals] (reduce push-signal- (handler f) signals)))
+
+(defn event
+  ([f] (proxy [AEvent IEventHandler] []
+         (onCallback [event]
+           (let [value (f event)]
+             (doseq [h (.handlers this)]
+               (.onCallback h this))
+             value))))
+  ([f & signals] (reduce push-signal- (event f) signals)))
 
 ;;
 ;; Trigger events and sets
@@ -67,19 +92,17 @@
 (defn trigger-set [& triggers]
   (reduce conj! (TriggerSet.) triggers))
 
-(defn trigger []
-  (TriggerSignal.))
+(defn trigger
+  ([] (TriggerSignal.))
+  ([& handlers] (reduce push-handler- (trigger) handlers)))
 
 ;;
 ;; Timer events
 ;;
 
-(defn timer
-  ([milliseconds] (TimerSignal. milliseconds))
-  ([milliseconds attachment] (doto (timer milliseconds) (attach! attachment))))
+(defn timer [milliseconds] (TimerSignal. milliseconds))
 
-(defn timer-set [& timers]
-  (reduce conj! (TimerSet.) timers))
+(defn timer-set [& timers] (reduce conj! (TimerSet.) timers))
 
 ;;
 ;; Selectors
