@@ -2,6 +2,7 @@ package madnet.event;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class MultiSignalSet implements ISignalSet {
     final TriggerSet triggers;
@@ -80,18 +81,23 @@ public class MultiSignalSet implements ISignalSet {
             selectors.select();
         }
         else {
-            executor.execute(new Runnable() {
+            Future f = executor.submit(new Runnable() {
                     @Override
                     public void run() {
-                        triggers.select();
                         try {
-                            selectors.interrupt();
-                        }
-                        catch(Exception e) {
+                            triggers.select();
+
+                            try {
+                                selectors.interrupt();
+                            }
+                            catch(Exception e) {
+                            }}
+                        catch(InterruptedException e) {
+                            Thread.currentThread().interrupt();
                         }}});
             
             selectors.select();
-            triggers.interrupt();
+            f.cancel(true);
         }
 
         return this;
@@ -119,19 +125,23 @@ public class MultiSignalSet implements ISignalSet {
             triggers.selectIn(timeout);
         }
         else {
-            executor.execute(new Runnable() {
+            Future f = executor.submit(new Runnable() {
                     @Override
                     public void run() {
-                        triggers.selectIn(timeout);
-                        
                         try {
-                            selectors.interrupt();
-                        }
-                        catch(Exception e) {
+                            triggers.selectIn(timeout);
+                        
+                            try {
+                                selectors.interrupt();
+                            }
+                            catch(Exception e) {
+                            }}
+                        catch(InterruptedException e) {
+                            Thread.currentThread().interrupt();
                         }}});
 
             selectors.selectIn(timeout);
-            triggers.interrupt();
+            f.cancel(true);
         }
 
         timers.selectNow();
@@ -156,11 +166,5 @@ public class MultiSignalSet implements ISignalSet {
         selectors.selectNow();
 
         return this;
-    }
-
-    @Override
-    public void interrupt() throws Exception {
-        triggers.interrupt();
-        selectors.interrupt();
     }
 } 

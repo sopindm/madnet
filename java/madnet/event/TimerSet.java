@@ -134,10 +134,8 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
         selections().add(s);
     }
 
-    Thread selectionThread = null;
-
     @Override
-    public TimerSet select() {
+    public TimerSet select() throws InterruptedException {
         if(!isOpen())
             throw new ClosedSelectorException();
 
@@ -145,25 +143,17 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
 
         long timestamp = System.currentTimeMillis();
 
-        if(selections().size() == 0 && signals().size() > 0 && timeouts.size() > 0
-           && timeouts.firstKey() > timestamp) {
-            try {
-                selectionThread = Thread.currentThread();
-                Thread.sleep(timeouts.firstKey() - timestamp);
-            }
-            catch(InterruptedException e) {
-            }
-            finally {
-                selectionThread = null;
-            }
-        }
+        if(selections().size() == 0 && signals().size() > 0
+           && timeouts.size() > 0
+           && timeouts.firstKey() > timestamp)
+            Thread.sleep(timeouts.firstKey() - timestamp);
         
         selectNow();
         return this;
     }
 
     @Override
-    public TimerSet selectIn(long milliseconds) {
+    public TimerSet selectIn(long milliseconds) throws InterruptedException {
         if(!isOpen())
             throw new ClosedSelectorException();
 
@@ -173,15 +163,7 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
 
         if(selections().size() == 0 && signals().size() > 0 && timeouts.size() > 0
            && timeouts.firstKey() > timestamp) {
-            try {
-                selectionThread = Thread.currentThread();
-                Thread.sleep(Math.min(timeouts.firstKey() - timestamp, milliseconds));
-            }
-            catch(InterruptedException e) {
-            }
-            finally {
-                selectionThread = null;
-            }
+            Thread.sleep(Math.min(timeouts.firstKey() - timestamp, milliseconds));
         }
 
         selectNow();
@@ -213,15 +195,5 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
         }
 
         return this;
-    }
-
-    @Override
-    public void interrupt() {
-        if(selectionThread != null) {
-            Thread interruptedThread = selectionThread;
-
-            if(interruptedThread != null)
-                interruptedThread.interrupt();
-        }
     }
 }

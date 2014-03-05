@@ -17,12 +17,13 @@ public abstract class Signal extends AEvent implements ISignal {
     @Override
     public void handle() {
         for(IEventHandler h : handlers())
-            h.onCallback(this);
+            h.onCallback(attachment);
     }
 
     @Override
     public void close() throws java.io.IOException {
         cancel();
+        attachment = null;
     }
 
     @Override
@@ -32,4 +33,13 @@ public abstract class Signal extends AEvent implements ISignal {
             provider = null;
         }
     }
+
+    Object attachment = null;
+
+    @Override
+    public Object attachment() { return attachment; }
+    
+    @Override
+    public void attach(Object attachment) {
+        this.attachment = attachment; }
 }

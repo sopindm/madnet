@@ -103,7 +103,7 @@ public class SelectorSet implements ISignalSet {
         @Override
         public void handle() {
             for(IEventHandler h : handlers())
-                h.onCallback(this);
+                h.onCallback(attachment);
         }
 
         @Override
@@ -126,6 +126,14 @@ public class SelectorSet implements ISignalSet {
         public void stop() {
             key.interestOps(0);
         }
+
+        Object attachment;
+
+        @Override
+        public Object attachment() { return attachment; }
+        
+        @Override
+        public void attach(Object attachment) { this.attachment = attachment; }
     }
 
     @Override
@@ -159,7 +167,6 @@ public class SelectorSet implements ISignalSet {
         return this;
     }
 
-    @Override
     public void interrupt() throws Exception {
         selector.wakeup();
         selectNow();

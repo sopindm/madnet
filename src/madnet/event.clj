@@ -1,5 +1,5 @@
 (ns madnet.event
-  (:refer-clojure :exclude [conj!])
+  (:refer-clojure :exclude [conj! loop])
   (:require [clojure.set :as s])
   (:import [madnet.event TriggerSignal TriggerSet TimerSignal TimerSet SelectorSignal SelectorSet
                          IEventHandler AEvent]
@@ -24,15 +24,11 @@
           :else (.select set))
     (.selections set)))
 
-(defn interrupt [set]
-  (.interrupt set))
-
 (defn cancel [x]
   (.cancel x))
 
 (defn close [x]
   (.close x))
-
 
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
@@ -51,6 +47,12 @@
        (clojure.core/conj! coll# (.next iterator#))
        (.remove iterator#))
      (persistent! coll#)))
+
+(defn attach! [signal attachment]
+  (.attach signal attachment))
+
+(defn attachment [signal]
+  (.attachment signal))
 
 (defn start! [& events]
   (doseq [e events] (.start e)))
@@ -73,17 +75,28 @@
   handler)
 
 (defn handler
-  ([f] (reify IEventHandler (onCallback [this event] (f event))))
+  ([f] (reify IEventHandler (onCallback [this a] (f a))))
   ([f & signals] (reduce push-signal- (handler f) signals)))
 
 (defn event
   ([f] (proxy [AEvent IEventHandler] []
-         (onCallback [event]
-           (let [value (f event)]
-             (doseq [h (.handlers this)]
-               (.onCallback h this))
-             value))))
+         (onCallback [arg]
+           (do (f arg)
+               (doseq [h (.handlers this)]
+                 (.onCallback h arg))))))
   ([f & signals] (reduce push-signal- (event f) signals)))
+
+(defmacro defsignal [name [& args] & body]
+  `(defn ~name
+     ([~@args attachment#] (doto (~name ~@args) (attach! attachment#)))
+     ([~@args] ~@body)))
+
+;;
+;; Flash signal
+;;
+
+(defsignal flash []
+  (madnet.event.FlashSignal.))
 
 ;;
 ;; Trigger events and sets
@@ -94,13 +107,14 @@
 
 (defn trigger
   ([] (TriggerSignal.))
-  ([& handlers] (reduce push-handler- (trigger) handlers)))
+  ([attachment] (doto (TriggerSignal.) (attach! attachment))))
 
 ;;
 ;; Timer events
 ;;
 
-(defn timer [milliseconds] (TimerSignal. milliseconds))
+(defsignal timer [milliseconds]
+  (TimerSignal. milliseconds))
 
 (defn timer-set [& timers] (reduce conj! (TimerSet.) timers))
 
@@ -108,7 +122,7 @@
 ;; Selectors
 ;;
 
-(defn selector [channel operation]
+(defsignal selector [channel operation]
   (let [op-code (case operation
                   :read SelectionKey/OP_READ
                   :write SelectionKey/OP_WRITE
@@ -126,3 +140,6 @@
 (defn selector-set [& events]
   (reduce conj! (SelectorSet.) events))
 
+(defn loop [event-set]
+  (do-selections [e event-set] (.handle e))
+  (recur event-set))

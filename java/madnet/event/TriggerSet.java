@@ -87,55 +87,32 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
         if(e == null)
             return;
 
-        //if(e.provider() != this)
-        //return;
-
         selections().add(e);
     }
 
-    Thread selectionThread = null;
-
     @Override
-    public TriggerSet select() {
+    public TriggerSet select() throws InterruptedException {
         if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelSignals();
 
-        if(selections().size() == 0 && signals.size() > 0) {
-            try {
-                selectionThread = Thread.currentThread();
-                pushSelection(triggered.take());
-            }
-            catch(InterruptedException e) {
-            }
-            finally {
-                selectionThread = null;
-            }
-        }
+        if(selections().size() == 0 && signals.size() > 0)
+            pushSelection(triggered.take());
 
         selectNow();
         return this;
     }
 
     @Override
-    public TriggerSet selectIn(long milliseconds) {
+    public TriggerSet selectIn(long milliseconds) throws InterruptedException {
         if(!isOpen())
             throw new ClosedSelectorException();
 
         cancelSignals();
 
-        if(selections().size() == 0 && signals.size() > 0) {
-            try {
-                selectionThread = Thread.currentThread();
-                pushSelection(triggered.poll(milliseconds, TimeUnit.MILLISECONDS));
-            }
-            catch(InterruptedException e) {
-            }
-            finally {
-                selectionThread = null;
-            }
-        }
+        if(selections().size() == 0 && signals.size() > 0)
+            pushSelection(triggered.poll(milliseconds, TimeUnit.MILLISECONDS));
 
         selectNow();
         return this;
@@ -153,15 +130,5 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
         }
 
         return this;
-    }
-
-    @Override
-    public void interrupt() {
-        if(selectionThread != null) {
-            Thread interruptedThread = selectionThread;
-
-            if(interruptedThread != null)
-                interruptedThread.interrupt();
-        }
     }
 }

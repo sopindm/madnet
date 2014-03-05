@@ -14,6 +14,4 @@ public interface ISignalSet extends java.io.Closeable {
     ISignalSet select() throws Exception;
     ISignalSet selectIn(long milliseconds) throws Exception;
     ISignalSet selectNow() throws Exception;
-
-    void interrupt() throws Exception;
 }

@@ -10,4 +10,7 @@ public interface ISignal extends IEvent, java.io.Closeable {
     void handle();
 
     ISignalSet provider();
+
+    void attach(Object attachment);
+    Object attachment();
 }

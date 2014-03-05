@@ -69,6 +69,13 @@
     (e/conj! (e/trigger-set) t)
     (?throws (e/conj! (e/trigger-set) t) IllegalArgumentException)))
 
+(deftest triggers-attachment
+  (let [t (e/trigger 42)]
+    (?= (e/attachment t) 42))
+  (let [t (e/trigger)]
+    (e/attach! t 123)
+    (?= (e/attachment t) 123)))
+
 (deftest selecting-tirgger-now
   (let [s (e/trigger-set)]
     (?= (seq (e/select s :timeout 0)) nil)
@@ -83,28 +90,6 @@
     (Thread/sleep 1)
     (?false (realized? f))
     (Thread/sleep 6)
-    (?true (realized? f))))
-
-(deftest interrupting-trigger-selection
-  (let [s (e/trigger-set (e/trigger))
-        f (future (e/select s))]
-    (Thread/sleep 5)
-    (?false (realized? f))
-    (e/interrupt s)
-    (Thread/sleep 2)
-    (?true (realized? f))
-    (?= (seq (.selections s)) nil)))
-    
-(deftest single-trigger-interrupt-does-not-interrupt-two-selections
-  (let [s (e/trigger-set (e/trigger))
-        f (future (e/select s)
-                  (e/select s))]
-    (Thread/sleep 2)
-    (e/interrupt s)
-    (Thread/sleep 2)
-    (?false (realized? f))
-    (e/interrupt s)
-    (Thread/sleep 2)
     (?true (realized? f))))
 
 (deftest canceling-trigger
@@ -133,13 +118,14 @@
     (?throws (e/conj! s t) ClosedSelectorException)))
 
 (deftest closing-tirgger-event
-  (let [t (e/trigger)
+  (let [t (e/trigger 123)
         s (e/trigger-set t)]
     (?= (.provider t) s)
     (e/start! t)
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
+    (?= (e/attachment t) nil)
     (?= (seq (e/signals s)) nil)))
 
 (deftest errors-adding-trigger
@@ -257,18 +243,6 @@
     (.setTimeout t 456)
     (?= (.timeout t) 456)))
 
-(deftest interrupting-timer
-  (letfn [(?interrupt [set future]
-            (?false (realized? future))
-            (e/interrupt set)
-            (Thread/sleep 1)
-            (?true (realized? future))
-            (?= (seq (.selections set)) nil))]
-    (let [s (e/timer-set (e/timer 100) (e/timer 500))]
-      (?interrupt s (future (e/select s))))
-    (let [s (e/timer-set (e/timer 100) (e/timer 100500))]
-      (?interrupt s (future (e/select s :timeout 100))))))
-
 (deftest closing-timer-provider
   (let [t (e/timer 123)
         s (e/timer-set t)]
@@ -287,10 +261,16 @@
         s (e/timer-set t)]
     (e/start! t)
     (.close t)
+    (?= (e/attachment t) nil)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
     (?= (seq (e/signals s)) nil)
     (?= (seq (.selections s)) nil)))
+
+(deftest timer-attachment
+  (let [t (e/timer 123 :some-attachment)]
+    (?= (.timeout t) 123)
+    (?= (e/attachment t) :some-attachment)))
 
 (deftest errors-adding-timer
   (let [t (e/timer 123)
@@ -348,7 +328,7 @@
         f (future (e/select s))]
     (Thread/sleep 2)
     (?false (realized? f))
-    (e/interrupt s)
+    (.interrupt s)
     (Thread/sleep 1)
     (?true (realized? f))))
 
@@ -374,6 +354,13 @@
     (?throws (e/select s :timeout 10) ClosedSelectorException)
     (?throws (e/conj! s we) ClosedSelectorException)))
 
+(deftest selector-attachments
+  (let [[reader writer] (pipe-)
+        e (e/selector reader :read)]
+    (?= (e/attachment e) nil)
+    (e/attach! e 123)
+    (?= (e/attachment e) 123)))
+
 (deftest errors-adding-selector
   (let [e (e/selector (first (pipe-)) :read)
         s (e/selector-set)]
@@ -385,9 +372,11 @@
   (let [[reader _] (pipe-)
         e (e/selector reader :read)
         s (e/selector-set e)]
+    (e/attach! e 123)
     (.close e)
     (e/select s :timeout 0)
     (?= (.provider e) nil)
+    (?= (e/attachment e) 123)
     (?= (seq (e/signals s)) nil)))
 
 (deftest accept-event
@@ -509,15 +498,6 @@
     (?= (seq (e/for-selections [e s :timeout 1] e)) nil)
     (?= (seq (e/for-selections [e s :timeout 10] e)) [e])))
 
-(deftest interrupt-multiset
-  (with-events [trigger [timer 10] [reader writer] s]
-    (e/start! timer reader)
-    (let [f (future (e/select s))]
-      (Thread/sleep 2)
-      (e/interrupt s)
-      (Thread/sleep 2)
-      (?true (realized? f)))))
-
 (deftest closing-multiset
   (with-events [trigger [timer 0] [reader writer] s]
     (.close s)
@@ -537,9 +517,9 @@
 ;;
 
 (defmacro with-handler [[handler expr & more-vars] & body]
-  `(let [~handler ~expr
+  `(let [~'signal (e/trigger :attachment)
+         ~handler ~expr
          ~@more-vars
-         ~'signal (e/trigger ~handler)
          set# (e/event-set ~'signal)
          ~'signal! (fn []
                      (e/start! ~'signal)
@@ -550,35 +530,106 @@
   (let [a (atom [])]
     (with-handler [handler (reify IEventHandler
                              (onCallback [this event] (swap! a conj event)))]
+      (.pushHandler signal handler)
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
-    (with-handler [handler (e/handler #(swap! a conj %))]
+    (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
-    (with-handler [handler (e/handler #(swap! a conj %))]
+    (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (let [handler (e/handler #(swap! a conj %) signal)]
         (signal!)
-        (?= @a [signal signal])))))
+        (?= @a [:attachment :attachment])))))
 
 (deftest simple-events
   (let [a (atom [])]
-    (with-handler [event (e/event #(swap! a conj %))]
+    (with-handler [event (e/event #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
-    (with-handler [event (e/event (constantly true))
+    (with-handler [event (e/event (constantly true) signal)
                    event2 (e/event #(swap! a conj %) event)]
       (signal!)
-      (?= @a [event]))))
+      (?= @a [:attachment]))))
 
 (deftest or-event-test
   (let [a (atom [])]
-    (with-handler [event (e/event (constantly true))
+    (with-handler [event (e/event (constantly true) signal)
                    event1 (e/event (constantly true) event)
                    event2 (e/event (constantly true) event)
                    or-event (e/event #(swap! a conj %) event1 event2)]
       (signal!)
-      (?= (set @a) #{event1 event2}))))
+      (?= @a [:attachment :attachment]))))
+
+(deftest timer-signal-events
+  (let [a (atom [])
+        t (e/timer 0 :something)
+        s (e/event-set t)
+        event (e/event #(swap! a conj %) t)]
+    (e/start! t)
+    (e/do-selections [e s] (e/handle! e))
+    (?= @a [:something])))
+
+(deftest selector-signal-events
+  (let [a (atom [])
+        signal (e/selector (second (pipe-)) :write :something)
+        s (e/event-set signal)
+        event (e/event #(swap! a conj %) signal)]
+    (e/start! signal)
+    (e/do-selections [e s] (e/handle! e))
+    (?= @a [:something])))
+
+;flash signal
+
+(deftest making-flash-signal
+  (let [a (atom [])
+        signal (e/flash)
+        event (e/event #(swap! a conj %) signal)]
+    (e/start! signal)
+    (?= @a [nil])))
+
+(deftest flash-signal-attachment
+  (?= (e/attachment (e/flash 42)) 42)
+  (let [signal (e/flash)]
+    (e/attach! signal 4321)
+    (?= (e/attachment signal) 4321)))
+
+(deftest closing-flash-signal
+  (let [signal (e/flash 123)]
+    (.close signal)
+    (?= (e/attachment signal) nil)))
+
+(deftest cannot-register-flash-signal
+  (let [signal (e/flash)]
+    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) signal)
+             UnsupportedOperationException)))
+
+;;
+;; Event loops
+;;
+
+(deftest event-loops
+  (let [a (atom [])
+        t1 (e/trigger 1)
+        t2 (e/trigger 2)
+        s (e/event-set t1 t2)
+        e1 (e/event #(swap! a conj %) t1)
+        e2 (e/event #(swap! a conj %) t2)
+        f (future (e/loop s))]
+    (e/start! t1)
+    (Thread/sleep 1)
+    (?= @a [1])
+    (reset! a [])
+    (e/start! t1 t2)
+    (Thread/sleep 1)
+    (?= (set @a) #{1 2})
+    (future-cancel f)))
+    
+    
+      
+
+
+
     
