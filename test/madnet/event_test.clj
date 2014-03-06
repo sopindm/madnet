@@ -532,27 +532,27 @@
                              (onCallback [this event] (swap! a conj event)))]
       (.pushHandler signal handler)
       (signal!)
-      (?= @a [:attachment])))
+      (?= @a [signal])))
   (let [a (atom [])]
     (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [:attachment])))
+      (?= @a [signal])))
   (let [a (atom [])]
     (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (let [handler (e/handler #(swap! a conj %) signal)]
         (signal!)
-        (?= @a [:attachment :attachment])))))
+        (?= @a [signal signal])))))
 
 (deftest simple-events
   (let [a (atom [])]
     (with-handler [event (e/event #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [:attachment])))
+      (?= @a [signal])))
   (let [a (atom [])]
     (with-handler [event (e/event (constantly true) signal)
                    event2 (e/event #(swap! a conj %) event)]
       (signal!)
-      (?= @a [:attachment]))))
+      (?= @a [signal]))))
 
 (deftest or-event-test
   (let [a (atom [])]
@@ -561,7 +561,7 @@
                    event2 (e/event (constantly true) event)
                    or-event (e/event #(swap! a conj %) event1 event2)]
       (signal!)
-      (?= @a [:attachment :attachment]))))
+      (?= @a [signal signal]))))
 
 (deftest timer-signal-events
   (let [a (atom [])
@@ -570,7 +570,7 @@
         event (e/event #(swap! a conj %) t)]
     (e/start! t)
     (e/do-selections [e s] (e/handle! e))
-    (?= @a [:something])))
+    (?= @a [t])))
 
 (deftest selector-signal-events
   (let [a (atom [])
@@ -579,7 +579,7 @@
         event (e/event #(swap! a conj %) signal)]
     (e/start! signal)
     (e/do-selections [e s] (e/handle! e))
-    (?= @a [:something])))
+    (?= @a [signal])))
 
 ;flash signal
 
@@ -620,11 +620,11 @@
         f (future (e/loop s))]
     (e/start! t1)
     (Thread/sleep 1)
-    (?= @a [1])
+    (?= @a [t1])
     (reset! a [])
     (e/start! t1 t2)
     (Thread/sleep 1)
-    (?= (set @a) #{1 2})
+    (?= (set @a) #{t1 t2})
     (future-cancel f)))
     
     

@@ -67,9 +67,8 @@
     (let [e (c/events p)
           s (e/event-set)]
       (c/register p s)
-      (?= (set (e/events s))
-          #{(.onRead e) (.onWrite e)
-            (.onReadClosed e) (.onWriteClosed e) (.onClosed e)}))))
+      (?= (set (e/signals s))
+          #{(.onRead e) (.onWrite e)}))))
 
 (deftest registering-pipe-reader-and-writer
   (with-open [pipe (c/pipe)]
@@ -77,14 +76,10 @@
           writer (.writer pipe)]
       (let [s (e/event-set)]
         (c/register reader s)
-        (?= (set (e/events s))
-            #{(-> pipe .events .onRead)
-              (-> pipe .events .onReadClosed)}))
+        (?= (seq (e/signals s)) [(-> pipe .events .onRead)]))
       (let [s (e/event-set)]
         (c/register writer s)
-        (?= (set (e/events s))
-            #{(-> pipe .events .onWrite)
-              (-> pipe .events .onWriteClosed)})))))
+        (?= (seq (e/signals s)) [(-> pipe .events .onWrite)])))))
 
 (deftest pipe-on-read-and-on-write-events
   (with-open [pipe (c/pipe)]
@@ -100,10 +95,12 @@
 (deftest pipe-closing-events
   (with-open [pipe (c/pipe)]
     (let [e (c/events pipe)
-          s (e/event-set)]
+          s (e/event-set)
+          a (atom [])
+          on-close (e/event #(swap! a conj %) (.onReadClosed e))]
       (c/register pipe s)
       (.closeRead pipe)
-      (?= (e/for-selections [e s :timeout 0] e) [(.onReadClosed e)])
+      (?= @a [(.reader pipe)])
       (?= (.provider (.onReadClosed e)) nil)
       (.closeWrite pipe)
       (?= (e/for-selections [e s :timeout 0] e) [(.onWriteClosed e)])

@@ -17,7 +17,7 @@ public abstract class Signal extends AEvent implements ISignal {
     @Override
     public void handle() {
         for(IEventHandler h : handlers())
-            h.onCallback(attachment);
+            h.onCallback(this);
     }
 
     @Override

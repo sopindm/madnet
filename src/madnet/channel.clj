@@ -2,9 +2,9 @@
   (:refer-clojure :exclude [read])
   (:require [madnet.channel.pipe])
   (:import [madnet.channel IChannel]
-           [madnet.event IEventSet]))
+           [madnet.event ISignalSet]))
 
-(defn register [^IChannel ch ^IEventSet set]
+(defn register [^IChannel ch ^ISignalSet set]
   (.register ch set))
 
 (defn events [^IChannel ch]

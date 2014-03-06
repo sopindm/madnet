@@ -10,10 +10,7 @@
   (clone [this] this)
   (events [this] events)
   (register [this set]
-    (let [events (.events this)]
-      (e/conj! set (.onRead events))
-      (e/conj! set (.onReadClosed events)))
-    this)
+    (e/conj! set (.onRead events)))
   (readable [this] (.isOpen ch))
   (closeRead [this]
     (e/start! (.onReadClosed events))
@@ -36,9 +33,7 @@
   (clone [this] this)
   (events [this] events)
   (register [this set]
-    (let [events (.events this)]
-      (e/conj! set (.onWrite events))
-      (e/conj! set (.onWriteClosed events))))
+    (e/conj! set (-> this .events .onWrite)))
   (readable [this] false)
   (closeRead [this] this)
   (writeable [this] (.isOpen ch))
@@ -65,8 +60,7 @@
   (events [this] events)
   (register [this set]
     (.register reader set)
-    (.register writer set)
-    (e/conj! set (-> this .events .onClosed)))
+    (.register writer set))
   (readable [this] (.readable reader))
   (closeRead [this] (.closeRead reader))
   (writeable [this] (.writeable writer))
@@ -80,9 +74,9 @@
   (let [pipe (java.nio.channels.Pipe/open)
         on-read (e/selector (.source pipe) :read)
         on-write (e/selector (.sink pipe) :write)
-        on-read-closed (e/trigger)
-        on-write-closed (e/trigger)
-        on-closed (e/trigger)]
+        on-read-closed (e/flash)
+        on-write-closed (e/flash)
+        on-closed (e/flash)]
     (.configureBlocking (.sink pipe) false)
     (.configureBlocking (.source pipe) false)
     (Pipe. (PipeReader. (.source pipe)

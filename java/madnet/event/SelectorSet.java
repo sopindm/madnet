@@ -103,7 +103,7 @@ public class SelectorSet implements ISignalSet {
         @Override
         public void handle() {
             for(IEventHandler h : handlers())
-                h.onCallback(attachment);
+                h.onCallback(this);
         }
 
         @Override

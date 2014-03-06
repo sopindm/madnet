@@ -14,7 +14,7 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
         if(timeouts.size() == 0)
             return null;
 
-        return timeouts.firstKey() - System.currentTimeMillis();
+        return Math.max(0, timeouts.firstKey() - System.currentTimeMillis());
     }
 
     public static class Signal extends madnet.event.Signal {
