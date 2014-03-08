@@ -1,14 +1,43 @@
 (ns madnet.event
   (:refer-clojure :exclude [conj! loop])
   (:require [clojure.set :as s])
-  (:import [madnet.event TriggerSignal TriggerSet TimerSignal TimerSet SelectorSignal SelectorSet
-                         IEventHandler AEvent]
-           [java.nio.channels SelectionKey]))
+  (:import [java.nio.channels SelectionKey]
+           [madnet.event EventHandler Event]))
+
+(defn- setup-handler- [handler args]
+  (let [emitters (remove keyword? args)
+        options (filter keyword? args)]
+    (reduce (fn [h e] (.pushHandler e h) h) handler emitters)
+    (when (some #{:one-shot} options) (.oneShot handler true))
+    handler))
+
+(defmacro ^:private handler-proxy [class [[emitter source] & on-call]
+                                   & methods]
+  `(proxy [~class] []
+     (call [~emitter ~source] ~@on-call
+       (proxy-super call ~emitter ~source))))
+
+(defn handler [f & emitters-and-options]
+  (setup-handler- (handler-proxy EventHandler ([e s] (f e s)))
+                  emitters-and-options))
+
+(defn event
+  ([] (handler-proxy Event ([e s])))
+  ([f] (handler-proxy Event ([e s] (f e s))))
+  ([f & emitters-and-options] (setup-handler- (event f)
+                                              emitters-and-options)))
+
+(defn handlers [event]
+  (.handlers event))
+
+(defn emit! [event source]
+  (.emit event source))
 
 ;;
 ;; Abstract events and sets
 ;;
 
+(comment 
 (defn conj! [set event]
   (.register event set)
   set)
@@ -77,18 +106,6 @@
   (.pushHandler signal handler)
   handler)
 
-(defn handler
-  ([f] (reify IEventHandler (onCallback [this a] (f a))))
-  ([f & signals] (reduce push-signal- (handler f) signals)))
-
-(defn event
-  ([f] (proxy [AEvent IEventHandler] []
-         (onCallback [arg]
-           (let [arg (f arg)]
-             (doseq [h (.handlers this)]
-               (.onCallback h arg))))))
-  ([f & signals] (reduce push-signal- (event f) signals)))
-
 (defmacro defsignal [name [& args] & body]
   `(defn ~name
      ([~@args attachment#] (doto (~name ~@args) (attach! attachment#)))
@@ -145,4 +162,4 @@
 
 (defn loop [event-set]
   (do-selections [e event-set] (.handle e))
-  (recur event-set))
+  (recur event-set)))

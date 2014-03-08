@@ -1,10 +1,46 @@
 (ns madnet.event-test
   (:require [khazad-dum :refer :all]
             [madnet.event :as e])
-  (:import [java.nio.channels ClosedSelectorException]
-           [madnet.event Signal SignalSet IEventHandler]))
+  (:import [java.nio.channels ClosedSelectorException]))
 
+(deftest making-simple-event
+  (let [sources (atom [])
+        emitters (atom [])
+        e (e/event)
+        h (e/handler #(do (swap! sources conj %2)
+                          (swap! emitters conj %1)) e)]
+    (?= (seq (e/handlers e)) [h])
+    (e/emit! e 123)
+    (?= @emitters [e])
+    (?= @sources [123])))
 
+(deftest one-shot-handlers
+  (let [sources (atom [])
+        e (e/event)
+        h (e/handler #(swap! sources conj %2) e :one-shot)]
+    (e/emit! e 123)
+    (?= @sources [123])
+    (?= (seq (e/handlers e)) nil)
+    (e/emit! e 123)
+    (?= @sources [123])))
+
+(deftest events-as-handlers
+  (let [sources (atom [])
+        e (e/event)
+        h1 (e/event #(swap! sources conj :1 %2) e)
+        h2 (e/event #(swap! sources conj :2 %2) e :one-shot)]
+    (e/emit! e 123)
+    (?= (set @sources) #{:1 123 :2})
+    (reset! sources [])
+    (e/emit! e 456)
+    (?= (seq @sources) [:1 456])))
+
+;making persistent events
+;transmitter event
+;closing event
+;emit multiple events
+
+(comment
 ;;
 ;; Triggers
 ;;
@@ -626,8 +662,4 @@
     (e/start! t1 t2)
     (Thread/sleep 1)
     (?= (set @a) #{1 2})
-    (future-cancel f)))
-
-
-
-    
+    (future-cancel f))))
