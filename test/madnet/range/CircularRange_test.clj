@@ -16,8 +16,7 @@
     (?range= cr [10 6])
     (?range= (.limit cr) [5 15])
     (?= (r/size cr) 6)
-    (?true (c/readable? cr))
-    (?true (c/writeable? cr))
+    (?true (c/open? cr))
     (?throws (crange 5 10 (irange 6 10)) IllegalArgumentException)
     (?throws (crange 5 10 (irange 5 9)) IllegalArgumentException)))
 
@@ -30,11 +29,6 @@
     (?range= cr2 [1 2])
     (r/take! 1 (.limit cr1))
     (?range= (.limit cr2) [0 4])))
-
-(deftest closing-circular-range
-  (let [cr (crange 0 5 (irange 0 5))]
-    (?throws (c/close! cr :read) UnsupportedOperationException)
-    (?throws (c/close! cr :write) UnsupportedOperationException)))
 
 (deftest circular-range-operations
   (let [cr (crange 0 0 (irange -5 5))]

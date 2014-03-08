@@ -26,8 +26,7 @@
         r (nrange 128 512 b)]
     (?range= r [128 512])
     (?buffer= (.buffer r) 128 512 1024)
-    (?true (c/readable? r))
-    (?true (c/writeable? r))))
+    (?true (c/open? r))))
 
 (deftest nio-range-operations
   (let [r (nrange 15 32 (ByteBuffer/allocate 100))]
@@ -37,11 +36,6 @@
     (?buffer= (.buffer r) 27 42 100)
     (?throws (r/expand! 59 r) IllegalArgumentException)
     (?throws (r/drop! 16 r) IndexOutOfBoundsException)))
-
-(deftest closing-nio-range
-  (let [r (nrange 0 10 (ByteBuffer/allocate 10))]
-    (?throws (c/close! r :read) UnsupportedOperationException)
-    (?throws (c/close! r :write) UnsupportedOperationException)))
 
 ;;
 ;; byte range

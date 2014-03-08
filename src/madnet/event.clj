@@ -43,10 +43,13 @@
   `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)
          coll# (transient ~(or (:into (apply hash-map options)) []))]
-     (while (.hasNext iterator#)
-       (clojure.core/conj! coll# (.next iterator#))
-       (.remove iterator#))
-     (persistent! coll#)))
+     (clojure.core/loop [coll# coll# iterator# iterator#]
+       (if-not (.hasNext iterator#)
+         (persistent! coll#)
+         (let [value# (.next iterator#)
+               conj# (clojure.core/conj! coll# value#)]
+           (.remove iterator#)
+           (recur conj# iterator#))))))
 
 (defn attach! [signal attachment]
   (.attach signal attachment))
@@ -81,9 +84,9 @@
 (defn event
   ([f] (proxy [AEvent IEventHandler] []
          (onCallback [arg]
-           (do (f arg)
-               (doseq [h (.handlers this)]
-                 (.onCallback h arg))))))
+           (let [arg (f arg)]
+             (doseq [h (.handlers this)]
+               (.onCallback h arg))))))
   ([f & signals] (reduce push-signal- (event f) signals)))
 
 (defmacro defsignal [name [& args] & body]

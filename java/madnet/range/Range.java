@@ -15,19 +15,12 @@ abstract public class Range implements IChannel, Iterable
     }
 
     @Override
-    public boolean readable() { return true; }
-    
-    @Override
-    public boolean writeable() { return true; }
-
-    @Override
-    public void closeRead() {
-        throw new UnsupportedOperationException();
+    public boolean isOpen() {
+        return true;
     }
 
     @Override
-    public void closeWrite() {
-        throw new UnsupportedOperationException();
+    public void close() {
     }
 
     @Override

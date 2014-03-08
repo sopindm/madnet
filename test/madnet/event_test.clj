@@ -4,6 +4,7 @@
   (:import [java.nio.channels ClosedSelectorException]
            [madnet.event Signal SignalSet IEventHandler]))
 
+
 ;;
 ;; Triggers
 ;;
@@ -532,36 +533,36 @@
                              (onCallback [this event] (swap! a conj event)))]
       (.pushHandler signal handler)
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
     (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
     (with-handler [handler (e/handler #(swap! a conj %) signal)]
       (let [handler (e/handler #(swap! a conj %) signal)]
         (signal!)
-        (?= @a [signal signal])))))
+        (?= @a [:attachment :attachment])))))
 
 (deftest simple-events
   (let [a (atom [])]
     (with-handler [event (e/event #(swap! a conj %) signal)]
       (signal!)
-      (?= @a [signal])))
+      (?= @a [:attachment])))
   (let [a (atom [])]
-    (with-handler [event (e/event (constantly true) signal)
+    (with-handler [event (e/event identity signal)
                    event2 (e/event #(swap! a conj %) event)]
       (signal!)
-      (?= @a [signal]))))
+      (?= @a [:attachment]))))
 
 (deftest or-event-test
   (let [a (atom [])]
-    (with-handler [event (e/event (constantly true) signal)
-                   event1 (e/event (constantly true) event)
-                   event2 (e/event (constantly true) event)
+    (with-handler [event (e/event identity signal)
+                   event1 (e/event identity event)
+                   event2 (e/event identity event)
                    or-event (e/event #(swap! a conj %) event1 event2)]
       (signal!)
-      (?= @a [signal signal]))))
+      (?= @a [:attachment :attachment]))))
 
 (deftest timer-signal-events
   (let [a (atom [])
@@ -570,7 +571,7 @@
         event (e/event #(swap! a conj %) t)]
     (e/start! t)
     (e/do-selections [e s] (e/handle! e))
-    (?= @a [t])))
+    (?= @a [:something])))
 
 (deftest selector-signal-events
   (let [a (atom [])
@@ -579,16 +580,16 @@
         event (e/event #(swap! a conj %) signal)]
     (e/start! signal)
     (e/do-selections [e s] (e/handle! e))
-    (?= @a [signal])))
+    (?= @a [:something])))
 
 ;flash signal
 
 (deftest making-flash-signal
   (let [a (atom [])
-        signal (e/flash)
+        signal (e/flash :something)
         event (e/event #(swap! a conj %) signal)]
     (e/start! signal)
-    (?= @a [nil])))
+    (?= @a [:something])))
 
 (deftest flash-signal-attachment
   (?= (e/attachment (e/flash 42)) 42)
@@ -620,15 +621,12 @@
         f (future (e/loop s))]
     (e/start! t1)
     (Thread/sleep 1)
-    (?= @a [t1])
+    (?= @a [1])
     (reset! a [])
     (e/start! t1 t2)
     (Thread/sleep 1)
-    (?= (set @a) #{t1 t2})
+    (?= (set @a) #{1 2})
     (future-cancel f)))
-    
-    
-      
 
 
 

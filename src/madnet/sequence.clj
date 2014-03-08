@@ -6,18 +6,14 @@
 
 (declare size)
 (deftype Sequence [buffer reader writer circular?]
-  Cloneable
-  Object
-  (clone [this] (Sequence. buffer (.clone reader) (.clone writer) circular?))
   clojure.lang.Seqable
   (seq [this] (seq (.reader this)))
   clojure.lang.Counted
   (count [this] (size this))
   madnet.channel.IChannel
-  (readable [this] (.readable reader))
-  (closeRead [this] (.closeRead reader))
-  (writeable [this] (.writeable writer))
-  (closeWrite [this] (.closeWrite writer))
+  (clone [this] (Sequence. buffer (.clone reader) (.clone writer) circular?))
+  (close [this] nil)
+  (isOpen [this] true)
   (write [this channel]
     (let [writer (.writer this)]
       (when-let [result (or (.write writer channel) (.read channel writer))]

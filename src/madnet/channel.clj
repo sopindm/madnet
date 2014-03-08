@@ -4,6 +4,9 @@
   (:import [madnet.channel IChannel]
            [madnet.event ISignalSet]))
 
+(defn open? [^IChannel ch]
+  (.isOpen ch))
+
 (defn register [^IChannel ch ^ISignalSet set]
   (.register ch set))
 
@@ -13,12 +16,6 @@
 ;;
 ;; Reading/writing
 ;;
-
-(defn readable? [^IChannel ch]
-  (.readable ch))
-
-(defn writeable? [^IChannel ch]
-  (.writeable ch))
 
 (defn write! [^IChannel dest ^IChannel src]
   (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.))))
@@ -37,13 +34,6 @@
         writen (.clone src)]
     (read! read writen)
     [read writen]))
-
-(defn close! [^IChannel channel & options]
-  (when (or (some #{:write} options) (empty? options))
-    (.closeWrite channel))
-  (when (or (some #{:read} options) (empty? options))
-    (.closeRead channel))
-  channel)
 
 (def pipe madnet.channel.pipe/pipe)
 

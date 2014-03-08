@@ -1,10 +1,11 @@
 package madnet.event;
 
 import java.util.Set;
-import java.util.HashSet;
+import java.util.WeakHashMap;
+import java.util.Collections;
 
 public class AEvent implements IEvent {
-    HashSet<IEventHandler> handlers = new HashSet<IEventHandler>();
+    Set<IEventHandler> handlers = Collections.newSetFromMap(new WeakHashMap<IEventHandler, Boolean>());
 
     public Set<IEventHandler> handlers() { return handlers; }
 

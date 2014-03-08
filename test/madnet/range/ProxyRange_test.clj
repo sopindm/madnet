@@ -23,9 +23,7 @@
 (deftest closing-range-proxy
   (let [r (irange 0 10)
         pr (r/proxy r)]
-    (?true (c/readable? pr))
-    (?true (c/writeable? pr))
-    (?throws (c/close! r) UnsupportedOperationException)))
+    (?true (c/open? pr))))
 
 (deftest range-proxy-operations
   (let [pr (r/proxy (irange 0 10))]

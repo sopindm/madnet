@@ -5,6 +5,10 @@
             [madnet.sequence :as s])
   (:import [madnet.channel Result]))
 
+;;
+;; General functions
+;;
+
 (deftest making-pipe
   (let [p (c/pipe)]
     (?= (c/write! p (s/wrap (byte-array (map byte (range 10)))))
@@ -34,33 +38,38 @@
         s (s/wrap (byte-array (map byte (range 10))))
         d (s/sequence [10 :element :byte])]
     (c/write p s)
-    (c/close! p :write)
-    (?throws (c/write p s) java.nio.channels.ClosedChannelException)
     (c/read p d)
-    (c/close! p :read)
+    (.close p)
+    (?throws (c/write p s) java.nio.channels.ClosedChannelException)
     (?throws (c/read p d) java.nio.channels.ClosedChannelException)))
 
 (deftest pipe-reader-and-writer
   (let [p (c/pipe)
         r (.reader p)
         w (.writer p)]
-    (?true (c/readable? r))
-    (?false (c/readable? w))
-    (?false (c/writeable? r))
-    (?true (c/writeable? w))))
+    (?true (c/open? r))
+    (?true (c/open? w))
+    (.close r)
+    (?false (c/open? r))
+    (?true (c/open? w))
+    (.close w)
+    (?false (c/open? w))))
 
 (deftest pipe-closeable-implementation
   (let [p (c/pipe)
         r (.reader p)
         w (.writer p)]
     (with-open [^java.io.Closeable reader r])
-    (?false (c/readable? r))
+    (?false (c/open? r))
     (with-open [^java.io.Closeable writer w])
-    (?false (c/writeable? w)))
+    (?false (c/open? w)))
   (let [p (c/pipe)]
     (with-open [pipe p])
-    (?false (c/readable? p))
-    (?false (c/writeable? p))))
+    (?false (c/open? p))))
+
+;;
+;; Events
+;;
 
 (deftest registering-channel-in-event-set
   (with-open [p (c/pipe)]
@@ -76,10 +85,17 @@
           writer (.writer pipe)]
       (let [s (e/event-set)]
         (c/register reader s)
-        (?= (seq (e/signals s)) [(-> pipe .events .onRead)]))
+        (?= (seq (e/signals s)) [(-> pipe .events :on-read)]))
       (let [s (e/event-set)]
         (c/register writer s)
-        (?= (seq (e/signals s)) [(-> pipe .events .onWrite)])))))
+        (?= (seq (e/signals s)) [(-> pipe .events :on-write)])))))
+
+(deftest pipe-events-attachment
+  (with-open [pipe (c/pipe)]
+    (let [e (c/events pipe)]
+      (?= (e/attachment (:on-read e)) (.reader pipe))
+      (?= (e/attachment (:on-write e)) (.writer pipe))
+      (?= (e/attachment (:on-close e)) pipe))))
 
 (deftest pipe-on-read-and-on-write-events
   (with-open [pipe (c/pipe)]
@@ -94,25 +110,38 @@
 
 (deftest pipe-closing-events
   (with-open [pipe (c/pipe)]
-    (let [e (c/events pipe)
-          s (e/event-set)
-          a (atom [])
-          on-close (e/event #(swap! a conj %) (.onReadClosed e))]
+    (let [s (e/event-set)
+          a (atom [])]
+      (e/event #(swap! a conj :read-closed %)
+               (-> pipe .reader .events :on-close))
+      (e/event #(swap! a conj :write-closed %)
+               (-> pipe .writer .events :on-close))
+      (e/event #(swap! a conj :closed %)
+               (-> pipe .events :on-close))
       (c/register pipe s)
-      (.closeRead pipe)
-      (?= @a [(.reader pipe)])
-      (?= (.provider (.onReadClosed e)) nil)
-      (.closeWrite pipe)
-      (?= (e/for-selections [e s :timeout 0] e) [(.onWriteClosed e)])
-      (?= (.provider (.onWriteClosed e)) nil)
+      (.close (.reader pipe))
+      (?= @a [:read-closed (.reader pipe)])
+      (?= (-> pipe .reader .events :on-close .provider) nil)
+      (.close (.writer pipe))
+      (?= @a [:read-closed (.reader pipe)
+              :write-closed (.writer pipe)
+              :closed pipe]) 
       (.close pipe)))
-  (let [pipe (c/pipe)
-        e (c/events pipe)
+  (let [a (atom [])
+        pipe (c/pipe)
         s (e/event-set)]
+    (e/event #(swap! a conj %) (-> pipe .reader .events :on-close))
+    (e/event #(swap! a conj %) (-> pipe .writer .events :on-close))
+    (e/event #(swap! a conj %) (-> pipe .events :on-close))
     (c/register pipe s)
     (.close pipe)
-    (?= (e/for-selections [e s :timeout 0 :into #{}] e)
-        #{(.onReadClosed e) (.onWriteClosed e) (.onClosed e)})
-    (?= (.provider (.onReadClosed e)) nil)
-    (?= (.provider (.onWriteClosed e)) nil)
-    (?= (.provider (.onClosed e)) nil)))
+    (?= (set @a) #{pipe (.reader pipe) (.writer pipe)})))
+
+(deftest pipe-with-closed-read-and-write-is-closed
+  (let [p (c/pipe)
+        a (atom [])
+        h (e/handler #(swap! a conj %) (:on-close (.events p)))]
+    (-> p .reader .close)
+    (-> p .writer .close)
+    (?false (c/open? p))
+    (?= @a [p])))

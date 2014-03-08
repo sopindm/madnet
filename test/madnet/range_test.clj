@@ -21,9 +21,7 @@
 
 (deftest closing-irange
   (let [r (irange 0 10)]
-    (?true (c/readable? r))
-    (?true (c/writeable? r))
-    (?throws (c/close! r) UnsupportedOperationException)))
+    (?true (c/open? r))))
 
 (deftest range-read-and-write
   (?throws (c/read! (irange 0 1) (irange 5 10))
