@@ -4,36 +4,107 @@
   (:import [java.nio.channels ClosedSelectorException]))
 
 (deftest making-simple-event
-  (let [sources (atom [])
-        emitters (atom [])
+  (let [actions (atom [])
         e (e/event)
-        h (e/handler #(do (swap! sources conj %2)
-                          (swap! emitters conj %1)) e)]
+        h (e/handler ([e s] (swap! actions conj :src s :emitter e)) e)]
     (?= (seq (e/handlers e)) [h])
+    (?= (seq (e/emitters h)) [e])
     (e/emit! e 123)
-    (?= @emitters [e])
-    (?= @sources [123])))
+    (?= @actions [:src 123 :emitter e])))
 
-(deftest one-shot-handlers
+(deftest closing-handler-during-iteration
+  (letfn [(handler- [event]
+            (e/handler ([e s] (.close this)) event))]
+    (let [e (e/event)
+          handlers (doall (repeatedly 100 #(handler- e)))]
+      (e/emit! e 123)
+      (?= (seq (e/handlers e)) nil)
+      (?= (seq (e/emitters (first handlers))) nil))))
+
+(deftest adding-handlers-during-iteration
+  (letfn [(handler- [e] (e/handler ([e s] (handler- e)) e))]
+    (let [e (e/event)
+          handlers (doall (repeatedly 10 #(handler- e)))]
+      (e/emit! e 123)
+      (?= (count (e/handlers e)) 20))))
+
+(deftest conj!-for-events
+  (let [actions (atom [])
+        e (e/event)
+        h (e/handler ([e s]))]
+    (e/conj! e h)
+    (?= (seq (e/handlers e)) [h])
+    (?= (seq (e/emitters h)) [e])))
+
+(deftest disj!-for-events
+  (let [e (e/event)
+        h1 (e/handler ([e s]) e)
+        h2 (e/handler ([e s]) e)]
+    (e/disj! e h1 h2)
+    (?= (seq (e/handlers e)) nil)
+    (?= (seq (e/emitters h1)) nil)
+    (?= (seq (e/emitters h2)) nil)))
+
+(deftest adding-and-removing-in-iteration-correctness
+  (let [e (e/event)
+        handler (e/handler ([e s] (.popHandler e this)) e)]
+    (e/emit! e 123)
+    (?= (seq (e/emitters handler)) nil))
+  (letfn [(handler- [e]
+            (e/handler ([e s]
+                          (.pushHandler e (handler- e))
+                          (.close this)) e))]
+    (let [e (e/event)
+          h (handler- e)]
+      (e/emit! e 123)
+      (?= (seq (e/emitters (first (e/handlers e)))) [e]))))
+
+(deftest removing-handler-without-iteration
+  (let [e (e/event)
+        handler (e/handler ([e s]) e)]
+    (.popHandler e handler)
+    (?= (seq (e/handlers e)) nil)
+    (?= (seq (e/emitters handler)) nil)))
+
+(deftest closing-events
+  (let [e (e/event)
+        h (e/handler ([e s]) e)]
+    (.close e)
+    (?= (seq (e/handlers e)) nil)
+    (?= (seq (e/emitters h)) nil)))
+
+(deftest closing-event-by-handler
+  (letfn [(handler- [e] (e/handler ([e s] (.close e)) e))]
+    (let [e (e/event)
+          handlers (repeatedly 100 #(handler- e))]
+      (e/emit! e 123)
+      (?= (seq (e/handlers e)) nil))))
+
+(deftest cannot-emit-emitting-event
+  (let [e (e/event)
+        handler (e/handler ([e s] (when (= s 123) (e/emit! e nil))) e)]
+    (?throws (e/emit! e 123) UnsupportedOperationException
+             "Cannot emit emitting event")))
+
+(comment 
+(deftest events-as-handlers
   (let [sources (atom [])
         e (e/event)
-        h (e/handler #(swap! sources conj %2) e :one-shot)]
+        h (e/event #(swap! sources conj :1 %2) e)]
+    (e/emit! e 123)
+    (?= (seq @sources) [:1 123])
+    (e/emit! e 456)
+    (?= (seq @sources) [:1 123 :1 456])))
+
+(deftest one-shot-event
+  (let [sources (atom [])
+        e (e/event)
+        h (e/event #(swap! sources conj %2) e :one-shot)]
     (e/emit! e 123)
     (?= @sources [123])
     (?= (seq (e/handlers e)) nil)
     (e/emit! e 123)
-    (?= @sources [123])))
-
-(deftest events-as-handlers
-  (let [sources (atom [])
-        e (e/event)
-        h1 (e/event #(swap! sources conj :1 %2) e)
-        h2 (e/event #(swap! sources conj :2 %2) e :one-shot)]
-    (e/emit! e 123)
-    (?= (set @sources) #{:1 123 :2})
-    (reset! sources [])
-    (e/emit! e 456)
-    (?= (seq @sources) [:1 456])))
+    (?= @sources [123]))))
 
 ;making persistent events
 ;transmitter event

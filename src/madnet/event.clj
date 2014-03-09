@@ -1,31 +1,37 @@
 (ns madnet.event
-  (:refer-clojure :exclude [conj! loop])
+  (:refer-clojure :exclude [conj! disj!])
   (:require [clojure.set :as s])
   (:import [java.nio.channels SelectionKey]
            [madnet.event EventHandler Event]))
 
-(defn- setup-handler- [handler args]
-  (let [emitters (remove keyword? args)
-        options (filter keyword? args)]
-    (reduce (fn [h e] (.pushHandler e h) h) handler emitters)
-    (when (some #{:one-shot} options) (.oneShot handler true))
-    handler))
+(defn- push-events-
+  ([handler] handler)
+  ([handler event] (.pushHandler event handler) handler)
+  ([handler event & more-events]
+     (reduce push-events- (push-events- handler event) more-events)))
 
-(defmacro ^:private handler-proxy [class [[emitter source] & on-call]
-                                   & methods]
-  `(proxy [~class] []
-     (call [~emitter ~source] ~@on-call
-       (proxy-super call ~emitter ~source))))
+(defn conj!
+  ([event] event)
+  ([event handler] (.pushHandler event handler) event)
+  ([event handler & more-handlers]
+     (reduce conj! (conj! event handler) more-handlers)))
 
-(defn handler [f & emitters-and-options]
-  (setup-handler- (handler-proxy EventHandler ([e s] (f e s)))
-                  emitters-and-options))
+(defn disj!
+  ([event] event)
+  ([event handler] (.popHandler event handler) event)
+  ([event handler & more-handlers]
+     (reduce disj! (disj! event handler) more-handlers)))
 
-(defn event
-  ([] (handler-proxy Event ([e s])))
-  ([f] (handler-proxy Event ([e s] (f e s))))
-  ([f & emitters-and-options] (setup-handler- (event f)
-                                              emitters-and-options)))
+(defmacro handler [[[emitter source] & handler] & events]
+  `(#'push-events- (proxy [EventHandler] []
+                     (call [~emitter ~source] ~@handler))
+                   ~@events))
+
+(defn event []
+  (Event.))
+
+(defn emitters [handler]
+  (.emitters handler))
 
 (defn handlers [event]
   (.handlers event))
