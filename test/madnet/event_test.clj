@@ -12,6 +12,14 @@
     (e/emit! e 123)
     (?= @actions [:src 123 :emitter e])))
 
+(deftest event-attachment
+  (let [sources (atom [])
+        e (e/event)
+        h (e/handler ([e s] (swap! sources conj s)) e)]
+    (e/attach! e 123)
+    (e/emit! e)
+    (?= @sources [123])))
+
 (deftest closing-handler-during-iteration
   (letfn [(handler- [event]
             (e/handler ([e s] (.close this)) event))]
@@ -47,12 +55,12 @@
 
 (deftest adding-and-removing-in-iteration-correctness
   (let [e (e/event)
-        handler (e/handler ([e s] (.popHandler e this)) e)]
+        handler (e/handler ([e s] (.disj e this)) e)]
     (e/emit! e 123)
     (?= (seq (e/emitters handler)) nil))
   (letfn [(handler- [e]
             (e/handler ([e s]
-                          (.pushHandler e (handler- e))
+                          (.conj e (handler- e))
                           (.close this)) e))]
     (let [e (e/event)
           h (handler- e)]
@@ -62,7 +70,7 @@
 (deftest removing-handler-without-iteration
   (let [e (e/event)
         handler (e/handler ([e s]) e)]
-    (.popHandler e handler)
+    (.disj e handler)
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/emitters handler)) nil)))
 
@@ -70,7 +78,9 @@
   (let [s (e/event)
         e (e/event () s)
         h (e/handler ([e s]) e)]
+    (e/attach! e 123)
     (.close e)
+    (?= (e/attachment e) nil)
     (?= (seq (e/handlers s)) nil)
     (?= (seq (e/emitters e)) nil)
     (?= (seq (e/handlers e)) nil)
@@ -108,14 +118,28 @@
 
 (deftest when-any-event
   (let [emitters (atom [])
+        sources (atom [])
         e1 (e/event)
         e2 (e/event)
         e (e/when-any e1 e2)
-        h (e/handler ([e _] (swap! emitters conj e)) e)]
+        h (e/handler ([e s]
+                        (swap! emitters conj e)
+                        (swap! sources conj s)) e)]
     (e/emit! e1 1)
     (?= (seq @emitters) [e])
+    (?= (seq @sources) [1])
     (e/emit! e2 2)
+    (?= (seq @sources) [1 2])
     (?= (seq @emitters) [e e])))
+
+(deftest when-any-event-with-attachment
+  (let [sources (atom [])
+        b (e/event)
+        e (e/when-any b)
+        h (e/handler ([e s] (swap! sources conj s)) e)]
+    (e/attach! e 456)
+    (e/emit! b 123)
+    (?= (seq @sources) [456])))
 
 (deftest when-every-test
   (let [sources (atom [])
@@ -131,7 +155,14 @@
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/handlers e1)) nil)
     (?= (seq (e/handlers e2)) nil)
-    (?= (seq (e/handlers e3)) nil)))
+    (?= (seq (e/handlers e3)) nil))
+  (let [sources (atom [])
+        b (e/event)
+        e (e/when-every b)
+        h (e/handler ([_ s] (swap! sources conj s)) e)]
+    (e/attach! e 123)
+    (e/emit! b 42)
+    (?= (seq @sources) [123])))
 
 (comment
 ;;

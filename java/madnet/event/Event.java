@@ -8,7 +8,9 @@ public class Event  extends EventHandler implements IEvent {
     @Override
     public void close() {
         Iterator<IEventHandler> it = handlers.iterator();
-        while(it.hasNext()) popHandler(it.next());
+        while(it.hasNext()) disj(it.next());
+
+        attachment = null;
 
         super.close();
     }
@@ -20,7 +22,15 @@ public class Event  extends EventHandler implements IEvent {
     boolean inIteration = false;
 
     @Override
-    public void emit(Object source) {
+    public void emit() {
+        handle();
+    }
+
+    public void handle() {
+        handle(attachment);
+    }
+
+    public void handle(Object source) {
         if(inIteration)
             throw new UnsupportedOperationException("Cannot emit emitting event");
 
@@ -44,42 +54,49 @@ public class Event  extends EventHandler implements IEvent {
     LinkedList<IEventHandler> removing = new LinkedList<IEventHandler>();
 
     private void updateHandlers() {
-        for(IEventHandler h : adding) pushHandlerImpl(h);
+        for(IEventHandler h : adding) conjImpl(h);
         adding.clear();
 
-        for(IEventHandler h :removing) popHandlerImpl(h);
+        for(IEventHandler h :removing) disjImpl(h);
         removing.clear();
     }
 
     @Override
     public HashSet<IEventHandler> handlers() { return handlers; }
 
-    private void pushHandlerImpl(IEventHandler handler) {
+    private void conjImpl(IEventHandler handler) {
         handlers.add(handler);
         handler.subscribe(this);
     }
 
     @Override
-    public void pushHandler(IEventHandler handler) {
+    public void conj(IEventHandler handler) {
         if(inIteration)
             adding.add(handler);
         else 
-            pushHandlerImpl(handler);
+            conjImpl(handler);
 
         handler.subscribe(this);
     }
 
-    private void popHandlerImpl(IEventHandler handler) {
+    private void disjImpl(IEventHandler handler) {
         handlers.remove(handler);
     }
 
     @Override
-    public void popHandler(IEventHandler handler) {
+    public void disj(IEventHandler handler) {
         if(inIteration)
             removing.add(handler);
         else
-            popHandlerImpl(handler);
+            disjImpl(handler);
 
         handler.unsubscribe(this);
     }
+
+    Object attachment = null;
+
+    @Override
+    public Object attachment() { return attachment; }
+    @Override
+    public void attach(Object attachment) { this.attachment = attachment; }
 }

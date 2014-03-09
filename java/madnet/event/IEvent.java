@@ -1,10 +1,10 @@
 package madnet.event;
 
-public interface IEvent extends IEventHandler {
-    public void emit(Object source);
+public interface IEvent extends IEventHandler, ISet<IEventHandler> {
+    public void emit();
 
     Iterable<IEventHandler> handlers();
 
-    public void pushHandler(IEventHandler handler);
-    public void popHandler(IEventHandler handler);
+    Object attachment();
+    void attach(Object attachment);
 }

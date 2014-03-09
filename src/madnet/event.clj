@@ -4,23 +4,31 @@
   (:import [java.nio.channels SelectionKey]
            [madnet.event EventHandler Event]))
 
-(defn- push-events-
-  ([handler] handler)
-  ([handler event] (.pushHandler event handler) handler)
-  ([handler event & more-events]
-     (reduce push-events- (push-events- handler event) more-events)))
+;;
+;; ISet
+;;
+
+(defn- conj-into-
+  ([value] value)
+  ([value set] (.conj set value) value)
+  ([value set & more-sets]
+     (reduce conj-into- (conj-into- value set) more-sets)))
 
 (defn conj!
-  ([event] event)
-  ([event handler] (.pushHandler event handler) event)
-  ([event handler & more-handlers]
-     (reduce conj! (conj! event handler) more-handlers)))
+  ([set] set)
+  ([set value] (.conj set value) set)
+  ([set value & more-values] 
+     (reduce conj! (conj! set value) more-values)))
 
 (defn disj!
-  ([event] event)
-  ([event handler] (.popHandler event handler) event)
-  ([event handler & more-handlers]
-     (reduce disj! (disj! event handler) more-handlers)))
+  ([set] set)
+  ([set value] (.disj set value) set)
+  ([set value & more-values]
+     (reduce disj! (disj! set value) more-values)))
+
+;;
+;; Generic events/handlers
+;;
 
 (defmacro handler- [class setup [[emitter source] & handler]
                     & events-and-options]
@@ -30,7 +38,7 @@
                    ~@events-and-options))
 
 (defmacro handler [[[emitter source] & handler] & events]
-  `(handler- EventHandler #'push-events-
+  `(handler- EventHandler #'conj-into-
              ([~emitter ~source] ~@handler) ~@events))
 
 (defn- setup-event- 
@@ -39,7 +47,7 @@
      (let [events (remove keyword? args)
            options (filter keyword? args)]
        (when (some #{:one-shot} options) (.oneShot event true))
-       (apply push-events- event events))))
+       (apply conj-into- event events))))
 
 (defmacro event
   ([] `(Event.))
@@ -47,31 +55,32 @@
      `(handler- Event #'setup-event-
                 ([~emitter ~source] ~@handler) ~@events)))
 
+(defn attach! [event obj] (.attach event obj) event)
+(defn attachment [event] (.attachment event))
+
 (defn emitters [handler]
   (.emitters handler))
 
 (defn handlers [event]
   (.handlers event))
 
-(defn emit! [event source]
-  (.emit event source))
+(defn emit!
+  ([event] (.emit event) event)
+  ([event obj] (attach! event obj) (emit! event)))
 
 (defn when-any
-  ([] (proxy [Event] [] (call [e s] (.emit this s))))
-  ([& events] (apply push-events- (when-any) events)))
+  ([] (proxy [Event] []
+        (call [e s] (.handle this (or (.attachment this) s)))))
+  ([& events] (apply conj-into- (when-any) events)))
          
 (defn when-every
   ([] (doto (proxy [Event] []
               (call [e s]
                 (disj! e this)
                 (when (-> this .emitters .isEmpty)
-                  (.emit this s))))
+                  (.handle this (or (.attachment this) s)))))
         (.oneShot true)))
-  ([& events] (apply push-events- (when-every) events)))
-
-;;
-;; Abstract events and sets
-;;
+  ([& events] (apply conj-into- (when-every) events)))
 
 (comment 
 (defn conj! [set event]

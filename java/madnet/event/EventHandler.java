@@ -13,7 +13,7 @@ public class EventHandler implements IEventHandler {
             IEvent e = events.next();
             events.remove();
 
-            e.popHandler(this);
+            e.disj(this);
         }
     }
 
