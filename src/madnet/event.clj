@@ -22,13 +22,30 @@
   ([event handler & more-handlers]
      (reduce disj! (disj! event handler) more-handlers)))
 
-(defmacro handler [[[emitter source] & handler] & events]
-  `(#'push-events- (proxy [EventHandler] []
-                     (call [~emitter ~source] ~@handler))
-                   ~@events))
+(defmacro handler- [class setup [[emitter source] & handler]
+                    & events-and-options]
+  `(~setup (proxy [~class] []
+                     (call [~(or emitter '_) ~(or source '_)]
+                       ~@handler))
+                   ~@events-and-options))
 
-(defn event []
-  (Event.))
+(defmacro handler [[[emitter source] & handler] & events]
+  `(handler- EventHandler #'push-events-
+             ([~emitter ~source] ~@handler) ~@events))
+
+(defn- setup-event- 
+  ([event] event)
+  ([event & args]
+     (let [events (remove keyword? args)
+           options (filter keyword? args)]
+       (when (some #{:one-shot} options) (.oneShot event true))
+       (apply push-events- event events))))
+
+(defmacro event
+  ([] `(Event.))
+  ([[[emitter source] & handler] & events]
+     `(handler- Event #'setup-event-
+                ([~emitter ~source] ~@handler) ~@events)))
 
 (defn emitters [handler]
   (.emitters handler))
@@ -38,6 +55,19 @@
 
 (defn emit! [event source]
   (.emit event source))
+
+(defn when-any
+  ([] (proxy [Event] [] (call [e s] (.emit this s))))
+  ([& events] (apply push-events- (when-any) events)))
+         
+(defn when-every
+  ([] (doto (proxy [Event] []
+              (call [e s]
+                (disj! e this)
+                (when (-> this .emitters .isEmpty)
+                  (.emit this s))))
+        (.oneShot true)))
+  ([& events] (apply push-events- (when-every) events)))
 
 ;;
 ;; Abstract events and sets

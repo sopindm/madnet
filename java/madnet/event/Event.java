@@ -8,9 +8,14 @@ public class Event  extends EventHandler implements IEvent {
     @Override
     public void close() {
         Iterator<IEventHandler> it = handlers.iterator();
-
         while(it.hasNext()) popHandler(it.next());
+
+        super.close();
     }
+
+    boolean oneShot = false;
+    public boolean oneShot() { return oneShot; }
+    public void oneShot(boolean value) { oneShot = value; }
 
     boolean inIteration = false;
 
@@ -29,6 +34,9 @@ public class Event  extends EventHandler implements IEvent {
         }
 
         updateHandlers();
+        
+        if(oneShot)
+            close();
     }
 
     HashSet<IEventHandler> handlers = new HashSet<IEventHandler>();
@@ -57,11 +65,12 @@ public class Event  extends EventHandler implements IEvent {
             adding.add(handler);
         else 
             pushHandlerImpl(handler);
+
+        handler.subscribe(this);
     }
 
     private void popHandlerImpl(IEventHandler handler) {
         handlers.remove(handler);
-        handler.unsubscribe(this);
     }
 
     @Override
@@ -70,5 +79,7 @@ public class Event  extends EventHandler implements IEvent {
             removing.add(handler);
         else
             popHandlerImpl(handler);
+
+        handler.unsubscribe(this);
     }
 }

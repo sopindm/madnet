@@ -67,9 +67,12 @@
     (?= (seq (e/emitters handler)) nil)))
 
 (deftest closing-events
-  (let [e (e/event)
+  (let [s (e/event)
+        e (e/event () s)
         h (e/handler ([e s]) e)]
     (.close e)
+    (?= (seq (e/handlers s)) nil)
+    (?= (seq (e/emitters e)) nil)
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/emitters h)) nil)))
 
@@ -86,180 +89,51 @@
     (?throws (e/emit! e 123) UnsupportedOperationException
              "Cannot emit emitting event")))
 
-(comment 
 (deftest events-as-handlers
-  (let [sources (atom [])
+  (let [actions (atom [])
         e (e/event)
-        h (e/event #(swap! sources conj :1 %2) e)]
+        h (e/event ([e s] (swap! actions conj :emit e :source s)) e)]
     (e/emit! e 123)
-    (?= (seq @sources) [:1 123])
-    (e/emit! e 456)
-    (?= (seq @sources) [:1 123 :1 456])))
+    (?= (seq @actions) [:emit e :source 123])))
 
 (deftest one-shot-event
   (let [sources (atom [])
-        e (e/event)
-        h (e/event #(swap! sources conj %2) e :one-shot)]
+        e (e/event () :one-shot)
+        h (e/handler ([e s] (swap! sources conj s)) e)]
     (e/emit! e 123)
     (?= @sources [123])
     (?= (seq (e/handlers e)) nil)
     (e/emit! e 123)
-    (?= @sources [123]))))
+    (?= @sources [123])))
 
-;making persistent events
-;transmitter event
-;closing event
-;emit multiple events
+(deftest when-any-event
+  (let [emitters (atom [])
+        e1 (e/event)
+        e2 (e/event)
+        e (e/when-any e1 e2)
+        h (e/handler ([e _] (swap! emitters conj e)) e)]
+    (e/emit! e1 1)
+    (?= (seq @emitters) [e])
+    (e/emit! e2 2)
+    (?= (seq @emitters) [e e])))
+
+(deftest when-every-test
+  (let [sources (atom [])
+        [e1 e2 e3] (repeatedly 3 #(e/event))
+        e (e/when-every e1 e2 e3)
+        h (e/handler ([_ s] (swap! sources conj s)) e)]
+    (e/emit! e1 1)
+    (e/emit! e2 2)
+    (e/emit! e3 3)
+    (?= (seq @sources) [3])
+    (?= (seq (e/emitters h)) nil)
+    (?= (seq (e/emitters e)) nil)
+    (?= (seq (e/handlers e)) nil)
+    (?= (seq (e/handlers e1)) nil)
+    (?= (seq (e/handlers e2)) nil)
+    (?= (seq (e/handlers e3)) nil)))
 
 (comment
-;;
-;; Triggers
-;;
-
-(deftest simple-triggering
-  (let [s (e/trigger-set)
-        t (e/trigger)]
-    (e/conj! s t)
-    (e/start! t)
-    (?= (seq (e/select s)) [t])))
-
-(deftest touching-trigger-twice-has-no-effect
-  (let [t (e/trigger)
-        s (e/trigger-set t)]
-    (e/start! t)
-    (e/start! t)
-    (?= (seq (e/select s)) [t])))
-
-(deftest touching-several-triggers
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (dorun (map e/start! [t1 t2]))
-    (?= (set (e/select s)) #{t1 t2})))
-
-(deftest touching-set-with-several-triggers
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (e/start! t1)
-    (?= (seq (e/select s)) [t1])))
-
-(deftest select!-is-blocking-for-triggers
-  (let [t (e/trigger)
-        s (e/trigger-set t)
-        f (future (e/select s))]
-    (Thread/sleep 10)
-    (?false (realized? f))
-    (e/start! t)
-    (let [a (agent f)]
-      (send-off a #(deref %))
-      (when (not (await-for 1000 a)) (throw (RuntimeException. "Agent timeout")))
-      (?= (seq @a) [t]))))
-
-(deftest do-selections-test
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (e/start! t1)
-    (e/start! t2)
-    (let [a (atom [])]
-      (e/do-selections [e s]
-        (swap! a conj e))
-      (?= (set @a) #{t1 t2})
-      (?= (seq (.selections s)) nil))))
-
-(deftest for-selections-test
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (e/start! t1 t2)
-    (?= (set (e/for-selections [e s] e))
-        #{t1 t2})))
-
-(deftest registering-trigger-in-multiple-sets-error
-  (let [t (e/trigger)]
-    (e/conj! (e/trigger-set) t)
-    (?throws (e/conj! (e/trigger-set) t) IllegalArgumentException)))
-
-(deftest triggers-attachment
-  (let [t (e/trigger 42)]
-    (?= (e/attachment t) 42))
-  (let [t (e/trigger)]
-    (e/attach! t 123)
-    (?= (e/attachment t) 123)))
-
-(deftest selecting-tirgger-now
-  (let [s (e/trigger-set)]
-    (?= (seq (e/select s :timeout 0)) nil)
-    (let [t (e/trigger)]
-      (e/conj! s t)
-      (e/start! t)
-      (?= (seq (e/select s :timeout 0)) [t]))))
-
-(deftest selecting-trigger-with-timeout
-  (let [s (e/trigger-set (e/trigger))
-        f (future (e/select s :timeout 3))]
-    (Thread/sleep 1)
-    (?false (realized? f))
-    (Thread/sleep 6)
-    (?true (realized? f))))
-
-(deftest canceling-trigger
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (e/cancel t1)
-    (e/select s :timeout 0)
-    (?= (set (e/signals s)) #{t2})
-    (let [f (future (e/select s :timeout 4))]
-      (Thread/sleep 2)
-      (e/cancel t2)
-      (?= (set @f) #{})
-      (?= (set (e/signals s)) #{}))))
-
-(deftest closing-trigger-provider
-  (let [t (e/trigger)
-        s (e/trigger-set t)]
-    (e/start! t)
-    (.close s)
-    (?= (.provider t) nil)
-    (?= (seq (e/signals s)) nil)
-    (?= (seq (.selections s)) nil)
-    (?throws (e/select s) ClosedSelectorException)
-    (?throws (e/select s :timeout 0) ClosedSelectorException)
-    (?throws (e/select s :timeout 10) ClosedSelectorException)
-    (?throws (e/conj! s t) ClosedSelectorException)))
-
-(deftest closing-tirgger-event
-  (let [t (e/trigger 123)
-        s (e/trigger-set t)]
-    (?= (.provider t) s)
-    (e/start! t)
-    (.close t)
-    (?= (.provider t) nil)
-    (e/select s :timeout 0)
-    (?= (e/attachment t) nil)
-    (?= (seq (e/signals s)) nil)))
-
-(deftest errors-adding-trigger
-  (let [t (e/trigger)
-        s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
-             IllegalArgumentException)))
-
-(deftest trigger-set-without-events-doesnt-block
-  (let [s (e/trigger-set)]
-    (?= (seq (e/select s)) nil)
-    (?= (seq (e/select s :timeout 1000000)) nil)))
-
-(deftest trigger-set-without-events-doesnt-block
-  (let [s (e/trigger-set)]
-    (?= (seq (e/select s)) nil)
-    (?= (seq (e/select s :timeout 1000000)) nil)))
-
-(deftest errors-adding-trigger
-  (let [t (e/trigger)
-        s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
-             IllegalArgumentException)))
-
 ;;
 ;; Timers
 ;;
@@ -713,6 +587,8 @@
   (let [signal (e/flash)]
     (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) signal)
              UnsupportedOperationException)))
+
+;making persistent triggers
 
 ;;
 ;; Event loops
