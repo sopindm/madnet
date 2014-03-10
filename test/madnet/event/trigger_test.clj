@@ -130,9 +130,6 @@
     (?= (seq (e/select s)) nil)
     (?= (seq (e/select s :timeout 1000000)) nil)))
 
-(deftest trigger-set-without-events-doesnt-block
-  (let [s (e/trigger-set)]
-    (?= (seq (e/select s)) nil)
-    (?= (seq (e/select s :timeout 1000000)) nil)))
-
-
+;handling trigger
+;closing trigger closes event
+;disj for trigger

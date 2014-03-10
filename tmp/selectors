@@ -1,0 +1,27 @@
+(events channel)
+(events channel :read :write :connect :accept)
+
+EventSet:       
+  Events
+  Providers
+  
+  waitFor(int timeout)                          
+
+Event providers:
+  SelectProvider
+  TimeoutProvider
+  TriggerProvider
+
+SelectProviders:
+  SelectionSet
+  Lambdas as attachment
+  Ops as attachment arguments
+
+TimeoutProvider
+  PriorityQueue
+
+TriggerProvider
+  Separate thread waiting for triggers
+  Interrupts selector
+
+        

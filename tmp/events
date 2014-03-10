@@ -1,0 +1,13 @@
+(handler ([emitter source] ...) e1 e2 e3)
+
+(event (call [emitter source] (println "Called"))
+       (emit [source] (println "Emitted"))
+       :emitters [e1 e2 e3]
+       :handlers [h1 h2 h3])
+
+(handler #(println "Hello, world"))
+
+(event :call #(println "Called")
+       :emit #(println "Emitted")
+       :emitters e1 e2 e3
+       :handlers h1 h2 h2)

@@ -68,6 +68,8 @@
   ([event] (.emit event) event)
   ([event obj] (attach! event obj) (emit! event)))
 
+(defn stop! [signal] (.stop signal))
+
 (defn when-any
   ([] (proxy [Event] []
         (call [e s] (.handle this (or (.attachment this) s)))))
@@ -100,14 +102,19 @@
           :else (.select set))
     (.selections set)))
 
-(defn trigger-set
-  ([] (madnet.event.TriggerSet.))
-  ([& triggers] (reduce conj! (trigger-set) triggers)))
+(defmacro defsignal [[name [& args] & body] [set-name & set-body]]
+  `(do (defn ~name
+         ([~@args attachment#] (doto (~name ~@args) (attach! attachment#)))
+         ([~@args] ~@body))
+       (defn ~set-name
+         ([] ~@set-body)
+         ([& triggers#] (reduce conj! (~set-name) triggers#)))))
 
-(defn trigger
-  ([] (madnet.event.TriggerSignal.))
-  ([attachment] (doto (madnet.event.TriggerSignal.)
-                  (attach! attachment))))
+(defsignal (trigger [] (madnet.event.TriggerSignal.))
+  (trigger-set (madnet.event.TriggerSet.)))
+
+(defsignal (timer [milliseconds] (madnet.event.TimerSignal. milliseconds))
+  (timer-set (madnet.event.TimerSet.)))
 
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
@@ -152,9 +159,6 @@
 (defn start! [& events]
   (doseq [e events] (.start e)))
 
-(defn stop! [& events]
-  (doseq [e events] (.stop e)))
-
 (defn handle! [& events]
   (doseq [e events] (.handle e)))
 
@@ -169,10 +173,6 @@
   (.pushHandler signal handler)
   handler)
 
-(defmacro defsignal [name [& args] & body]
-  `(defn ~name
-     ([~@args attachment#] (doto (~name ~@args) (attach! attachment#)))
-     ([~@args] ~@body)))
 
 ;;
 ;; Flash signal
@@ -190,10 +190,6 @@
 ;; Timer events
 ;;
 
-(defsignal timer [milliseconds]
-  (TimerSignal. milliseconds))
-
-(defn timer-set [& timers] (reduce conj! (TimerSet.) timers))
 
 ;;
 ;; Selectors

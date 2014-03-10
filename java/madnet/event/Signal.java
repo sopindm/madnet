@@ -5,7 +5,7 @@ public abstract class Signal extends Event implements ISignal {
     public SignalSet<? extends Signal> provider() { return provider; };
 
     @Override
-    public void register(ISignalSet provider) throws Exception {
+    public void register(ISignalSet provider) {
         if(this.provider != null)
             throw new IllegalArgumentException();
         
@@ -13,19 +13,13 @@ public abstract class Signal extends Event implements ISignal {
     }
 
     @Override
-    public void handle() {
-        for(IEventHandler h : handlers())
-            h.call(this, attachment);
-    }
-
-    @Override
     public void close() throws java.io.IOException {
         cancel();
-        attachment = null;
+        super.close();
     }
 
     @Override
-    public void cancel() throws java.io.IOException {
+    public void cancel() {
         if(provider != null) {
             provider.disj((ISignal)this);
             provider = null;

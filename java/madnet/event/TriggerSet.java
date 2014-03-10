@@ -17,7 +17,7 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
         }
 
         @Override
-        public void register(ISignalSet provider) throws Exception {
+        public void register(ISignalSet provider) {
             super.register(provider);
 
             if(!(this.provider instanceof TriggerSet))
@@ -49,7 +49,7 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
     }
 
     @Override
-    public void conj(ISignal signal) throws Exception {
+    public void conj(ISignal signal) {
         if(!isOpen())
             throw new ClosedSelectorException();
 
