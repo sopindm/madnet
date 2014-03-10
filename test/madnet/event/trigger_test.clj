@@ -1,43 +1,34 @@
-(ns madnet.test.trigger-test
+(ns madnet.event.trigger-test
   (:require [khazad-dum :refer :all]
-            [madnet.event :as e]))
+            [madnet.event :as e])
+  (:import [java.nio.channels ClosedSelectorException]))
 
 (deftest simple-triggering
   (let [s (e/trigger-set)
         e (e/trigger)]
     (e/conj! s e)
     (e/emit! e)
+    (?= (.provider e) s)
+    (?= (seq (e/signals s)) [e])
     (?= (seq (e/select s)) [e])))
-
-(comment
-;;
-;; Triggers
-;;
-
-(deftest simple-triggering
-  (let [s (e/trigger-set)
-        t (e/trigger)]
-    (e/conj! s t)
-    (e/start! t)
-    (?= (seq (e/select s)) [t])))
 
 (deftest touching-trigger-twice-has-no-effect
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/start! t)
-    (e/start! t)
+    (e/emit! t)
+    (e/emit! t)
     (?= (seq (e/select s)) [t])))
 
 (deftest touching-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (dorun (map e/start! [t1 t2]))
+    (dorun (map e/emit! [t1 t2]))
     (?= (set (e/select s)) #{t1 t2})))
 
 (deftest touching-set-with-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/start! t1)
+    (e/emit! t1)
     (?= (seq (e/select s)) [t1])))
 
 (deftest select!-is-blocking-for-triggers
@@ -46,7 +37,7 @@
         f (future (e/select s))]
     (Thread/sleep 10)
     (?false (realized? f))
-    (e/start! t)
+    (e/emit! t)
     (let [a (agent f)]
       (send-off a #(deref %))
       (when (not (await-for 1000 a)) (throw (RuntimeException. "Agent timeout")))
@@ -55,8 +46,8 @@
 (deftest do-selections-test
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/start! t1)
-    (e/start! t2)
+    (e/emit! t1)
+    (e/emit! t2)
     (let [a (atom [])]
       (e/do-selections [e s]
         (swap! a conj e))
@@ -64,30 +55,23 @@
       (?= (seq (.selections s)) nil))))
 
 (deftest for-selections-test
-  (let [[t1 t2] (repeatedly 2 e/trigger)
-        s (e/trigger-set t1 t2)]
-    (e/start! t1 t2)
+  (let [triggers (repeatedly 100 e/trigger)
+        s (apply e/trigger-set triggers)]
+    (doall (map e/emit! triggers))
     (?= (set (e/for-selections [e s] e))
-        #{t1 t2})))
+        (set triggers))))
 
 (deftest registering-trigger-in-multiple-sets-error
   (let [t (e/trigger)]
     (e/conj! (e/trigger-set) t)
     (?throws (e/conj! (e/trigger-set) t) IllegalArgumentException)))
 
-(deftest triggers-attachment
-  (let [t (e/trigger 42)]
-    (?= (e/attachment t) 42))
-  (let [t (e/trigger)]
-    (e/attach! t 123)
-    (?= (e/attachment t) 123)))
-
 (deftest selecting-tirgger-now
   (let [s (e/trigger-set)]
     (?= (seq (e/select s :timeout 0)) nil)
     (let [t (e/trigger)]
       (e/conj! s t)
-      (e/start! t)
+      (e/emit! t)
       (?= (seq (e/select s :timeout 0)) [t]))))
 
 (deftest selecting-trigger-with-timeout
@@ -101,19 +85,19 @@
 (deftest canceling-trigger
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/cancel t1)
+    (e/cancel! t1)
     (e/select s :timeout 0)
     (?= (set (e/signals s)) #{t2})
     (let [f (future (e/select s :timeout 4))]
       (Thread/sleep 2)
-      (e/cancel t2)
+      (e/cancel! t2)
       (?= (set @f) #{})
       (?= (set (e/signals s)) #{}))))
 
 (deftest closing-trigger-provider
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/start! t)
+    (e/emit! t)
     (.close s)
     (?= (.provider t) nil)
     (?= (seq (e/signals s)) nil)
@@ -127,7 +111,7 @@
   (let [t (e/trigger 123)
         s (e/trigger-set t)]
     (?= (.provider t) s)
-    (e/start! t)
+    (e/emit! t)
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
@@ -137,8 +121,8 @@
 (deftest errors-adding-trigger
   (let [t (e/trigger)
         s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
+    (?throws (e/conj! s (proxy [madnet.event.Signal] [])) IllegalArgumentException)
+    (?throws (e/conj! (proxy [madnet.event.SignalSet] [] (conj [event] (.register event this))) t)
              IllegalArgumentException)))
 
 (deftest trigger-set-without-events-doesnt-block
@@ -150,12 +134,5 @@
   (let [s (e/trigger-set)]
     (?= (seq (e/select s)) nil)
     (?= (seq (e/select s :timeout 1000000)) nil)))
-
-(deftest errors-adding-trigger
-  (let [t (e/trigger)
-        s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [Signal] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [SignalSet] [] (push [event] nil)) t)
-             IllegalArgumentException))))
 
 

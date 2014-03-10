@@ -6,7 +6,7 @@ import java.util.HashSet;
 
 public class EventHandler implements IEventHandler {
     @Override
-    public void close() {
+    public void close() throws java.io.IOException {
         Iterator<IEvent> events = emitters.iterator();
 
         while(events.hasNext()) {

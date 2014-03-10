@@ -6,7 +6,7 @@ import java.util.LinkedList;
 
 public class Event  extends EventHandler implements IEvent {
     @Override
-    public void close() {
+    public void close() throws java.io.IOException {
         Iterator<IEventHandler> it = handlers.iterator();
         while(it.hasNext()) disj(it.next());
 
@@ -22,15 +22,15 @@ public class Event  extends EventHandler implements IEvent {
     boolean inIteration = false;
 
     @Override
-    public void emit() {
+    public void emit() throws Exception {
         handle();
     }
 
-    public void handle() {
+    public void handle() throws Exception {
         handle(attachment);
     }
 
-    public void handle(Object source) {
+    public void handle(Object source) throws Exception {
         if(inIteration)
             throw new UnsupportedOperationException("Cannot emit emitting event");
 

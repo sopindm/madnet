@@ -82,13 +82,15 @@
         (.oneShot true)))
   ([& events] (apply conj-into- (when-every) events)))
 
-(comment 
-(defn conj! [set event]
-  (.register event set)
-  set)
+;;
+;; Signals
+;;
 
 (defn signals [set]
   (.signals set))
+
+(defn cancel! [x]
+  (.cancel x))
 
 (defn select [set & {:as options}]
   (let [timeout (:timeout options)
@@ -98,11 +100,14 @@
           :else (.select set))
     (.selections set)))
 
-(defn cancel [x]
-  (.cancel x))
+(defn trigger-set
+  ([] (madnet.event.TriggerSet.))
+  ([& triggers] (reduce conj! (trigger-set) triggers)))
 
-(defn close [x]
-  (.close x))
+(defn trigger
+  ([] (madnet.event.TriggerSignal.))
+  ([attachment] (doto (madnet.event.TriggerSignal.)
+                  (attach! attachment))))
 
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
@@ -124,6 +129,19 @@
                conj# (clojure.core/conj! coll# value#)]
            (.remove iterator#)
            (recur conj# iterator#))))))
+
+(comment 
+(defn conj! [set event]
+  (.register event set)
+  set)
+
+(defn signals [set]
+  (.signals set))
+
+(defn close [x]
+  (.close x))
+
+
 
 (defn attach! [signal attachment]
   (.attach signal attachment))
@@ -167,12 +185,6 @@
 ;; Trigger events and sets
 ;;
 
-(defn trigger-set [& triggers]
-  (reduce conj! (TriggerSet.) triggers))
-
-(defn trigger
-  ([] (TriggerSignal.))
-  ([attachment] (doto (TriggerSignal.) (attach! attachment))))
 
 ;;
 ;; Timer events

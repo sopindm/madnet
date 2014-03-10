@@ -1,7 +1,6 @@
 (ns madnet.event-test
   (:require [khazad-dum :refer :all]
-            [madnet.event :as e])
-  (:import [java.nio.channels ClosedSelectorException]))
+            [madnet.event :as e]))
 
 (deftest making-simple-event
   (let [actions (atom [])
