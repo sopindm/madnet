@@ -136,5 +136,12 @@
     (e/selector connect-ch :write)
     (?throws (e/selector connect-ch :accept) IllegalArgumentException)))
 
-
+(deftest making-no-persistent-selector
+  (let [e (e/selector (second (pipe-)) :write)
+        s (e/selector-set e)]
+    (e/set-persistent! e false)
+    (?false (e/persistent? e))
+    (e/emit! e)
+    (?= (e/for-selections [e s] (.handle e) e) [e])
+    (?= (seq (e/select s :timeout 0)) nil)))
 

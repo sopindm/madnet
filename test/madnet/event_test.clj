@@ -175,7 +175,9 @@
          ~reader (e/selector (first pipe#) :read)
          ~writer (e/selector (second pipe#) :write)
          ~set (e/event-set ~trigger ~timer ~reader ~writer)]
-     ~@body))
+     ~@body
+     (.close ~'a-pipe-reader)
+     (.close ~'a-pipe-writer)))
 
 (defn pipe- []
   (let [pipe (java.nio.channels.Pipe/open)]
@@ -276,6 +278,12 @@
     (e/stop! writer)
     (?= (set (e/for-selections [e s :timeout 10] e)) #{timer})))
 
+(defmacro with-timeout [timeout & form]
+  `(let [agent# (agent nil)]
+     (send-off agent# (fn [s#] ~@form))
+     (when-not (await-for ~timeout agent#)
+       (throw (Exception. (str "Agent timeout: " (agent-errors agent#)))))))
+
 (deftest selecting-multiset-with-only-timeouts
   (let [e (e/timer 4)
         s (e/event-set e)]
@@ -298,7 +306,7 @@
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/event-set t1 t2)]
     (e/emit! t1) (e/emit! t2)
-    (?= (e/for-selections [e s :into #{}]) #{t1 t2})))
+    (?= (e/for-selections [e s :into #{}] e) #{t1 t2})))
 
 (deftest disj-on-multiset
   (with-events [trigger [timer 0] [reader writer] s]
@@ -311,7 +319,14 @@
     (?= (.provider writer) nil)
     (?throws (e/disj! s (proxy [madnet.event.Signal] [])) IllegalArgumentException)))
 
-;making persistent triggers, selectors
+(deftest default-events-persistence
+  (with-events [trigger [timer 0] [reader writer] s]
+    (?false (e/persistent? trigger))
+    (?false (e/persistent? timer))
+    (?true (e/persistent? reader))
+    (?true (e/persistent? writer))))
+
+;making triggers, selectors with explicit persistence
 
 ;;
 ;; Event loops

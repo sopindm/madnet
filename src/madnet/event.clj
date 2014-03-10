@@ -94,6 +94,12 @@
 (defn cancel! [x]
   (.cancel x))
 
+(defn persistent? [signal]
+  (.persistent signal))
+
+(defn set-persistent! [signal persistent?]
+  (.persistent signal persistent?))
+
 (defn select [set & {:as options}]
   (let [timeout (:timeout options)
         now? (and timeout (zero? timeout))]
@@ -153,7 +159,8 @@
      (clojure.core/loop [coll# coll# iterator# iterator#]
        (if-not (.hasNext iterator#)
          (persistent! coll#)
-         (let [value# (.next iterator#)
+         (let [~var (.next iterator#)
+               value# (do ~@body)
                conj# (clojure.core/conj! coll# value#)]
            (.remove iterator#)
            (recur conj# iterator#))))))

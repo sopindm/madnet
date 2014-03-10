@@ -58,8 +58,10 @@
   (let [triggers (repeatedly 100 e/trigger)
         s (apply e/trigger-set triggers)]
     (doall (map e/emit! triggers))
-    (?= (set (e/for-selections [e s] e))
-        (set triggers))))
+    (?= (set (e/for-selections [e s] e)) (set triggers))
+    (?= (e/for-selections [e s :timeout 0] e) [])
+    (doall (map e/emit! (take 3 triggers)))
+    (?= (e/for-selections [e s] 1) (repeat 3 1))))
 
 (deftest registering-trigger-in-multiple-sets-error
   (let [t (e/trigger)]
@@ -156,3 +158,12 @@
     (e/select s :timeout 0)
     (?= (.provider e) nil)
     (?= (seq (e/signals s)) nil)))
+
+(deftest making-persistent-trigger
+  (let [e (e/trigger)
+        s (e/trigger-set e)]
+    (e/set-persistent! e true)
+    (?true (e/persistent? e))
+    (e/emit! e)
+    (?= (e/for-selections [e s] (.handle e) e) [e])
+    (?= (seq (e/select s :timeout 0)) [e])))

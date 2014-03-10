@@ -28,6 +28,8 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
         public void emit() {
             if(provider() != null)
                 provider().triggered.add(this);
+            else
+                throw new UnsupportedOperationException();
         }
 
         @Override

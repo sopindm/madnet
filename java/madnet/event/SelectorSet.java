@@ -123,6 +123,21 @@ public class SelectorSet implements ISignalSet {
         public void stop() {
             key.interestOps(0);
         }
+
+        boolean persistent = true;
+
+        @Override
+        public boolean persistent() { return persistent; }
+        @Override
+        public void persistent(boolean value) { persistent = value; }
+
+        @Override
+        public void handle(Object source) throws Exception {
+            super.handle(source);
+            
+            if(!persistent())
+                stop();
+        }
     }
 
     @Override

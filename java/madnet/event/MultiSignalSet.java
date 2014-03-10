@@ -177,6 +177,9 @@ public class MultiSignalSet implements ISignalSet {
         if(timeout != null)
             milliseconds = Math.min(timeout, milliseconds);
 
+        if(timeout <= 0)
+            return selectNow();
+
         return selectInImpl(milliseconds);
     }
 

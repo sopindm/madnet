@@ -26,4 +26,18 @@ public abstract class Signal extends Event implements ISignal {
             provider = null;
         }
     }
+
+    boolean persistent = false;
+    @Override
+    public boolean persistent() { return persistent; }
+    @Override
+    public void persistent(boolean value) { persistent = value; }
+
+    @Override
+    public void handle(Object source) throws Exception {
+        super.handle(source);
+
+        if(persistent)
+            emit();
+    }
 }
