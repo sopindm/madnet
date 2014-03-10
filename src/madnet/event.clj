@@ -1,5 +1,5 @@
 (ns madnet.event
-  (:refer-clojure :exclude [conj! disj!])
+  (:refer-clojure :exclude [conj! disj! loop])
   (:require [clojure.set :as s])
   (:import [java.nio.channels SelectionKey]
            [madnet.event EventHandler Event]))
@@ -133,6 +133,10 @@
       (madnet.event.SelectorSignal. channel op-code)))
   (selector-set (madnet.event.SelectorSet.)))
 
+(defn event-set
+  ([] (madnet.event.MultiSignalSet.))
+  ([& events] (reduce conj! (event-set) events)))
+
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)]
@@ -154,69 +158,6 @@
            (.remove iterator#)
            (recur conj# iterator#))))))
 
-(comment 
-(defn conj! [set event]
-  (.register event set)
-  set)
-
-(defn signals [set]
-  (.signals set))
-
-(defn close [x]
-  (.close x))
-
-
-
-(defn attach! [signal attachment]
-  (.attach signal attachment))
-
-(defn attachment [signal]
-  (.attachment signal))
-
-(defn start! [& events]
-  (doseq [e events] (.start e)))
-
-(defn handle! [& events]
-  (doseq [e events] (.handle e)))
-
-(defn event-set [& events]
-  (reduce conj! (madnet.event.MultiSignalSet.) events))
-
-(defn- push-handler- [signal handler]
-  (.pushHandler signal handler)
-  signal)
-
-(defn- push-signal- [handler signal]
-  (.pushHandler signal handler)
-  handler)
-
-
-;;
-;; Flash signal
-;;
-
-(defsignal flash []
-  (madnet.event.FlashSignal.))
-
-;;
-;; Trigger events and sets
-;;
-
-
-;;
-;; Timer events
-;;
-
-
-;;
-;; Selectors
-;;
-
-
-
-(defn selector-set [& events]
-  (reduce conj! (SelectorSet.) events))
-
 (defn loop [event-set]
   (do-selections [e event-set] (.handle e))
-  (recur event-set)))
+  (recur event-set))

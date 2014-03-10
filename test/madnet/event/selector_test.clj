@@ -1,13 +1,8 @@
 (ns madnet.event.selector-test
   (:require [khazad-dum :refer :all]
-            [madnet.event :as e])
+            [madnet.event :as e]
+            [madnet.event-test :refer [pipe-]])
   (:import [java.nio.channels ClosedSelectorException]))
-
-(defn pipe- []
-  (let [pipe (java.nio.channels.Pipe/open)]
-    (.configureBlocking (.sink pipe) false)
-    (.configureBlocking (.source pipe) false)
-    [(.source pipe) (.sink pipe)]))
 
 (defmacro with-pipe-events [[source sink reader writer set] & body]
   `(let [[~source ~sink] (pipe-)
