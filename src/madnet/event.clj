@@ -116,6 +116,23 @@
 (defsignal (timer [milliseconds] (madnet.event.TimerSignal. milliseconds))
   (timer-set (madnet.event.TimerSet.)))
 
+(defsignal
+  (selector [channel operation]
+    (let [op-code (case operation
+                    :read SelectionKey/OP_READ
+                    :write SelectionKey/OP_WRITE
+                    :accept SelectionKey/OP_ACCEPT
+                    :connect SelectionKey/OP_CONNECT)]
+      (letfn [(check-option [name type]
+                (when (and (= operation name) (not (instance? type channel)))
+                  (throw (IllegalArgumentException.))))]
+        (check-option :write java.nio.channels.WritableByteChannel)
+        (check-option :read java.nio.channels.ReadableByteChannel)
+        (check-option :accept java.nio.channels.ServerSocketChannel)
+        (check-option :connect java.nio.channels.SocketChannel))
+      (madnet.event.SelectorSignal. channel op-code)))
+  (selector-set (madnet.event.SelectorSet.)))
+
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)]
@@ -195,20 +212,7 @@
 ;; Selectors
 ;;
 
-(defsignal selector [channel operation]
-  (let [op-code (case operation
-                  :read SelectionKey/OP_READ
-                  :write SelectionKey/OP_WRITE
-                  :accept SelectionKey/OP_ACCEPT
-                  :connect SelectionKey/OP_CONNECT)]
-    (letfn [(check-option [name type]
-              (when (and (= operation name) (not (instance? type channel)))
-                (throw (IllegalArgumentException.))))]
-      (check-option :write java.nio.channels.WritableByteChannel)
-      (check-option :read java.nio.channels.ReadableByteChannel)
-      (check-option :accept java.nio.channels.ServerSocketChannel)
-      (check-option :connect java.nio.channels.SocketChannel))
-    (SelectorSignal. channel op-code)))
+
 
 (defn selector-set [& events]
   (reduce conj! (SelectorSet.) events))

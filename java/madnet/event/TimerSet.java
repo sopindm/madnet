@@ -68,6 +68,9 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
 
         @Override
         public void stop() {
+            if(provider() == null)
+                return;
+
             LinkedList<Signal> signal = provider().timeouts.get(finishStamp);
             if(signal == null)
                 return;
@@ -102,7 +105,7 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
             throw new IllegalArgumentException();
 
         signals().add((Signal)signal);
-        signal.register(this);
+        ((Signal)signal).register(this);
     }
 
     @Override
@@ -123,6 +126,7 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
             if(s != null) {
                 signals().remove(s);
                 selections().remove(s);
+                s.cancel();
             }
         }
     }

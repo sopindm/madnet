@@ -127,3 +127,10 @@
     (?throws (e/conj! (proxy [madnet.event.SignalSet] [] (conj [event] (.register event this))) t)
              IllegalArgumentException)))
 
+(deftest disj-for-timers
+  (let [t (e/timer 123)
+        s (e/timer-set t)]
+    (e/disj! s t)
+    (e/select s :timeout 0)
+    (?= (seq (e/signals s)) nil)
+    (?= (.provider t) nil)))

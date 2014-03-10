@@ -57,7 +57,7 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
             throw new IllegalArgumentException();
 
         signals().add((Signal)signal);
-        signal.register(this);
+        ((Signal)signal).register(this);
     }
 
     @Override
@@ -78,6 +78,8 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
             if(s != null) {
                 signals().remove(s);
                 selections().remove(s);
+
+                s.cancel();
             }
         }
     }

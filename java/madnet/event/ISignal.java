@@ -1,7 +1,9 @@
 package madnet.event;
 
 public interface ISignal extends IEvent {
-    void register(ISignalSet set);
+    ISignalSet provider();
+
+    void register(ISignalSet set) throws Exception;
     void cancel();
 
     void stop();

@@ -130,6 +130,29 @@
     (?= (seq (e/select s)) nil)
     (?= (seq (e/select s :timeout 1000000)) nil)))
 
-;handling trigger
-;closing trigger closes event
-;disj for trigger
+(deftest handling-trigger
+  (let [t (e/trigger)
+        actions (atom [])
+        h (e/handler ([e s] (swap! actions conj {:emit e :src s})) t)]
+    (e/attach! t 123)
+    (.handle t)
+    (?= (seq @actions) [{:emit t :src 123}])
+    (.handle t 456)
+    (?= (seq @actions) [{:emit t :src 123} {:emit t :src 456}])))
+
+(deftest closing-trigger-closes-events-and-handles
+  (let [e (e/event)
+        t (e/trigger)
+        h (e/handler () t)]
+    (e/conj! e t)
+    (.close t)
+    (?= (seq (e/handlers e)) nil)
+    (?= (seq (e/emitters h)) nil)))
+
+(deftest disj-for-trigger-sets
+  (let [e (e/trigger)
+        s (e/trigger-set e)]
+    (e/disj! s e)
+    (e/select s :timeout 0)
+    (?= (.provider e) nil)
+    (?= (seq (e/signals s)) nil)))

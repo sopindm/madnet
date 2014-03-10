@@ -2,6 +2,7 @@ package madnet.event;
 
 public abstract class Signal extends Event implements ISignal {
     protected SignalSet<? extends Signal> provider = null;
+    @Override
     public SignalSet<? extends Signal> provider() { return provider; };
 
     @Override
