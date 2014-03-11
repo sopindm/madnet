@@ -65,7 +65,19 @@ public class PipeWriter extends madnet.channel.Channel {
 
     @Override
     public boolean tryPush(Object obj) throws Exception {
-        throw new UnsupportedOperationException();
+        if(!(obj instanceof Byte))
+            throw new IllegalArgumentException();
+
+        byte[] bytes = new byte[1];
+        bytes[0] = (byte)obj;
+
+        java.nio.ByteBuffer src = java.nio.ByteBuffer.wrap(bytes);
+        channel.write(src);
+
+        if(src.limit() - src.position() > 0)
+            return false;
+
+        return true;
     }
 
     @Override

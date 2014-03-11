@@ -177,8 +177,31 @@
     (c/write p (s/wrap (byte-array 10)))
     (?= (seq @a) [(.writer p)])))
 
-;pushing to pipe
-;pushing to full pipe
-;popping from pipe
-;popping from empty pipe
+(deftest pusing-to-pipe
+  (let [p (c/pipe)
+        s (s/sequence [5 :element :byte])]
+    (?= (c/push! p (byte 123)) p)
+    (c/write! s p)
+    (?= (seq s) [123])
+    (?throws (c/push! p 123) IllegalArgumentException)
+    (c/push! p (byte 12) :timeout 0)
+    (c/push! p (byte 1) :timeout 10)
+    (c/write! s p) 
+    (?= (seq s) [123 12 1])))
+
+(deftest pushing-to-full-pipe
+  (let [p (c/pipe)]
+    (c/write! p (s/wrap (byte-array 1000000)))
+    (?= (c/push! p (byte 123) :timeout 0) nil)))
+
+(deftest popping-from-pipe
+  (let [p (c/pipe)]
+    (dotimes [i 3]
+      (c/push! p (byte i)))
+    (?= (c/pop! p) 0)
+    (?= (c/pop! p :timeout 0) 1)
+    (?= (c/pop! p :timeout 10) 2)))
+
+(deftest popping-from-empty-pipe
+  (?= (c/pop! (c/pipe) :timeout 0) nil))
 

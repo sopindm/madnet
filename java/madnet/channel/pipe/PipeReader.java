@@ -70,7 +70,15 @@ public class PipeReader extends madnet.channel.Channel {
 
     @Override
     public Object tryPop() throws Exception {
-        throw new UnsupportedOperationException();
+        byte[] bytes = new byte[1];
+
+        java.nio.ByteBuffer src = java.nio.ByteBuffer.wrap(bytes);
+        channel.read(src);
+
+        if(src.limit() - src.position() > 0)
+            return null;
+
+        return bytes[0];
     }
 
     @Override

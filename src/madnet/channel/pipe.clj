@@ -11,6 +11,12 @@
   (clone [this] this)
   (events [this] events)
   (register [this set] (.register reader set) (.register writer set))
+  (push [this obj] (.push writer obj))
+  (push [this obj timeout] (.push writer obj timeout))
+  (tryPush [this obj] (.tryPush writer obj))
+  (pop [this] (.pop reader))
+  (pop [this timeout] (.pop reader timeout))
+  (tryPop [this] (.tryPop reader))
   (write [this channel] (.write writer channel))
   (read [this channel] (.read reader channel)))
 
