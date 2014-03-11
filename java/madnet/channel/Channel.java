@@ -12,19 +12,6 @@ public abstract class Channel implements IChannel {
     }
 
     @Override
-    public Object pop() throws Exception {
-        Object result = tryPop();
-
-        while(result == null && !Thread.currentThread().isInterrupted())
-            result = tryPop();
-
-        if(Thread.interrupted())
-            throw new InterruptedException();
-
-        return result;
-    }
-
-    @Override
     public Object peek() throws Exception {
         Object result = tryPeek();
 
@@ -40,19 +27,20 @@ public abstract class Channel implements IChannel {
 
         do {
             if(tryPush(object)) return true;
-        }
-        while(System.currentTimeMillis() < finishTimestamp);
+        }while(System.currentTimeMillis() < finishTimestamp);
 
         return false;
     }
 
     @Override
-    public Object pop(long timeout) throws Exception {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public Object peek(long timeout) throws Exception {
-        throw new UnsupportedOperationException();
+        long finishTimestamp = System.currentTimeMillis() + timeout;
+
+        do {
+            Object value = tryPeek();
+            if(value != null) return value;
+        }while(System.currentTimeMillis() < finishTimestamp);
+
+        return null;
     }
 }

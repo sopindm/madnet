@@ -42,9 +42,9 @@
     (if timeout (if (zero? timeout) (try-push-) (push-with-timeout-))
       (push-))))
 
-(defn pop! [ch & args] (.pop ch) ch)
-
-(defn peek! [ch & args] (.peek ch) ch)
+(defn peek! [ch & {timeout :timeout}]
+  (if timeout (if (zero? timeout) (.tryPeek ch) (.peek ch timeout))
+      (.peek ch)))
 
 ;;
 ;; Wrappers
