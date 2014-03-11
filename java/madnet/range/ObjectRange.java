@@ -63,6 +63,28 @@ public class ObjectRange extends IntegerRange {
     }
 
     @Override
+    public boolean tryPush(Object obj) throws Exception {
+        if(size() == 0)
+            return false;
+
+        buffer.set(begin(), obj);
+        drop(1);
+
+        return true;
+    }
+
+    @Override
+    public Object tryPop() throws Exception {
+        if(size() == 0)
+            return null;
+
+        Object result = buffer.get(begin());
+        drop(1);
+
+        return result;
+    }
+
+    @Override
     public Result write(IChannel channel) throws Exception {
         if(!(channel instanceof Range))
             return null;

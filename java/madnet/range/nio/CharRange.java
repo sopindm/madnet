@@ -54,6 +54,26 @@ public class CharRange extends Range {
     }
 
     @Override
+    public boolean tryPush(Object o) throws Exception {
+        if(!(o instanceof Character))
+            throw new IllegalArgumentException();
+
+        if(size() == 0)
+            return false;
+
+        buffer().put((Character)o);
+        return true;
+    }
+
+    @Override
+    public Object tryPop() throws Exception {
+        if(size() == 0)
+            return null;
+
+        return buffer().get();
+    }
+
+    @Override
     public Result write(madnet.channel.IChannel ch) throws Exception {
         if(!(ch instanceof CharRange))
             return null;

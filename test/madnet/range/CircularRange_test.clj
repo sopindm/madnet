@@ -86,3 +86,23 @@
 (deftest circular-range-iterator
   (?= (seq (circular srange 3 1 (range 5))) [3 4 0]))
 
+(deftest pushing-to-circular-range
+  (let [r (circular srange 2 1 (repeat 4 nil))
+        rc (.clone r)]
+    (?range= (c/push! r 123) [3 1])
+    (?range= (c/push! r 234) [0 1])
+    (?range= (c/push! r 345) [1 1])
+    (?= (c/push! r 111 :timeout 0) nil)
+    (?= (seq rc) [123 234 345])))
+
+(deftest peeking-circular-range
+  (let [r (circular srange 2 1 (range 4))
+        rc (.clone r)]
+    (?= (c/pop! r) 2)
+    (?= (c/pop! r) 3)
+    (?= (c/pop! r) 0)
+    (?= (c/pop! r :timeout 0) nil)))
+    
+    
+
+

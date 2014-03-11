@@ -91,12 +91,12 @@ abstract public class Range extends madnet.channel.Channel implements Iterable
     }
 
     @Override
-    public boolean tryPush(Object object) {
+    public boolean tryPush(Object object) throws Exception {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Object tryPeek() {
+    public Object tryPop() throws Exception {
         throw new UnsupportedOperationException();
     }
 }

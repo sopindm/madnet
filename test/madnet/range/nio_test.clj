@@ -110,6 +110,24 @@
     (?range= dest [5 10])
     (?= (seq (r/take 5 dest-clone)) [2 3 4 5 6])))
 
+(deftest pushing-to-byte-range
+  (let [b (ByteBuffer/allocate 2)
+        r (byte-range 0 2 b)]
+    (?range= (c/push! r (byte 123)) [1 2])
+    (?throws (c/push! r 123) IllegalArgumentException)
+    (?range= (c/push! r (byte 34)) [2 2])
+    (?= (c/push! r (byte 0) :timeout 0) nil)
+    (?= (.get b) (byte 123))
+    (?= (.get b) (byte 34))))
+
+(deftest popping-from-byte-range
+  (let [b (ByteBuffer/wrap (byte-array (map byte (range 3))))
+        r (byte-range 0 3 b)]
+    (?= (c/pop! r) 0)
+    (?= (c/pop! r) 1)
+    (?= (c/pop! r) 2)
+    (?= (c/pop! r :timeout 0) nil)))
+
 ;;
 ;; Char Range
 ;;
@@ -217,6 +235,24 @@
                           (byte-range- 0 1 [-1])
                           (Charset/forName "UTF8"))
              java.nio.charset.CharacterCodingException)))
+
+(deftest pushing-to-char-range
+  (let [b (CharBuffer/allocate 2)
+        r (char-range 0 2 b)]
+    (?range= (c/push! r \a) [1 2])
+    (?throws (c/push! r "a") IllegalArgumentException)
+    (?range= (c/push! r \b) [2 2])
+    (?= (c/push! r \c :timeout 0) nil)
+    (?= (.get b) \a)
+    (?= (.get b) \b)))
+
+(deftest popping-from-byte-range
+  (let [b (CharBuffer/wrap "abc")
+        r (char-range 0 3 b)]
+    (?= (c/pop! r) \a)
+    (?= (c/pop! r) \b)
+    (?= (c/pop! r) \c)
+    (?= (c/pop! r :timeout 0) nil)))
 
 
 

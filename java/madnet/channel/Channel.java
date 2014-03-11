@@ -12,11 +12,11 @@ public abstract class Channel implements IChannel {
     }
 
     @Override
-    public Object peek() throws Exception {
-        Object result = tryPeek();
+    public Object pop() throws Exception {
+        Object result = tryPop();
 
         while(result == null)
-            result = tryPeek();
+            result = tryPop();
 
         return result;
     }
@@ -33,11 +33,11 @@ public abstract class Channel implements IChannel {
     }
 
     @Override
-    public Object peek(long timeout) throws Exception {
+    public Object pop(long timeout) throws Exception {
         long finishTimestamp = System.currentTimeMillis() + timeout;
 
         do {
-            Object value = tryPeek();
+            Object value = tryPop();
             if(value != null) return value;
         }while(System.currentTimeMillis() < finishTimestamp);
 

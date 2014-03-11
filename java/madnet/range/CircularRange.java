@@ -143,6 +143,36 @@ public class CircularRange extends Range
     }
 
     @Override
+    public boolean tryPush(Object obj) throws Exception {
+        if(size() == 0) return false;
+         
+        if(range.size() == 0) {
+            begin(range.begin());
+            return tryPush(obj);
+        }
+
+        boolean result = range.tryPush(obj);
+        begin(range.begin());
+
+        return result;
+    }
+
+    @Override
+    public Object tryPop() throws Exception {
+        if(size() == 0) return null;
+         
+        if(range.size() == 0) {
+            begin(range.begin());
+            return tryPop();
+        }
+
+        Object result = range.tryPop();
+        begin(range.begin());
+
+        return result;
+    }
+
+    @Override
     public Result write(IChannel ch) throws Exception {
         Result writeResult = range.write(ch);
 

@@ -78,6 +78,21 @@
         pr (r/proxy r)]
     (?= (seq pr) (seq (range 10)))))
 
+(deftest pushing-to-proxy
+  (let [r (srange 0 1 [nil])
+        cr (.clone r)
+        pr (r/proxy r)]
+    (?range= (.range (c/push! pr 123)) [1 1])
+    (?= (c/push! pr 234 :timeout 0) nil)
+    (?= (seq cr) [123])))
+
+(deftest popping-proxy
+  (let [r (srange 0 1 [123])
+        pr (r/proxy r)]
+    (?= (c/pop! pr) 123)
+    (?= (c/pop! pr :timeout 0) nil)
+    (?range= r [1 1])))
+
 
 
 

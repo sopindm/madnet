@@ -86,6 +86,16 @@ public class ProxyRange extends Range
     }        
 
     @Override
+    public boolean tryPush(Object o) throws Exception {
+        return range.tryPush(o);
+    }
+
+    @Override
+    public Object tryPop() throws Exception {
+        return range.tryPop();
+    }
+
+    @Override
     public Result write(madnet.channel.IChannel ch) throws Exception {
         Result writeResult = range.write(ch);
         if(writeResult != null)

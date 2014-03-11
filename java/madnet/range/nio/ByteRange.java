@@ -50,6 +50,28 @@ public class ByteRange extends Range {
     }
 
     @Override
+    public boolean tryPush(Object o) throws Exception {
+        if(!(o instanceof Byte))
+            throw new IllegalArgumentException();
+
+        if(size() == 0)
+            return false;
+
+        Byte b = (Byte)o;
+
+        buffer().put(b);
+        return true;
+    }
+
+    @Override
+    public Object tryPop() throws Exception {
+        if(size() == 0)
+            return null;
+
+        return buffer().get();
+    }
+
+    @Override
     public Result write(IChannel ch) throws Exception {
         if(!(ch instanceof ByteRange))
             return null;

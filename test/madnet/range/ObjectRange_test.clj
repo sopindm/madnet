@@ -61,3 +61,17 @@
     (?= (c/write! r ar) (Result. 5 5))
     (?range= ar [5 5])
     (?= (seq rc) (seq (concat (range 5) (repeat 5 nil))))))
+
+(deftest pushing-to-object-range
+  (let [r (object-range 0 1 (repeat 1 nil))
+        rc (.clone r)]
+    (?range= (c/push! r 123) [1 1])
+    (?= (c/push! r 123 :timeout 0) nil)
+    (?= (seq rc) [123])))
+
+(deftest peeking-object-range
+  (let [r (object-range 0 1 [0])]
+    (?= (c/pop! r) 0)
+    (?= (c/pop! r :timeout 0) nil)))
+    
+    

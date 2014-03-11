@@ -31,9 +31,9 @@
   (?throws (c/push! (irange 0 10) []) UnsupportedOperationException)
   (?throws (c/push! (irange 0 10) [] :timeout 0) UnsupportedOperationException)
   (?throws (c/push! (irange 0 10) [] :timeout 10) UnsupportedOperationException)
-  (?throws (c/peek! (irange 0 10)) UnsupportedOperationException)
-  (?throws (c/peek! (irange 0 10) :timeout 0) UnsupportedOperationException)
-  (?throws (c/peek! (irange 0 10) :timeout 10) UnsupportedOperationException))
+  (?throws (c/pop! (irange 0 10)) UnsupportedOperationException)
+  (?throws (c/pop! (irange 0 10) :timeout 0) UnsupportedOperationException)
+  (?throws (c/pop! (irange 0 10) :timeout 10) UnsupportedOperationException))
 
 (deftest range-mutable-take-drop-and-expand
   (let [r (irange 5 10)]
@@ -103,7 +103,7 @@
                                         (drop (inc (.begin this)) %)))
                    (r/drop! 1 this)
                    true)))
-      (tryPeek []
+      (tryPop []
         (when (pos? (count this))
           (let [result (nth @coll (.begin this))]
             (r/drop! 1 this)
@@ -214,17 +214,17 @@
 
 (deftest peeking-from-range
   (let [r (srange 0 3 (range 3))]
-    (?= (c/peek! r) 0)
-    (?= (c/peek! r :timeout 0) 1)
-    (?= (c/peek! r :timeout 1000) 2)))
+    (?= (c/pop! r) 0)
+    (?= (c/pop! r :timeout 0) 1)
+    (?= (c/pop! r :timeout 1000) 2)))
 
 (deftest peeking-from-empty-range-with-zero-timeout
   (let [r (srange 1 1 (range 10))]
-    (?= (c/peek! r :timeout 0) nil)))
+    (?= (c/pop! r :timeout 0) nil)))
 
 (deftest peeking-from-empty-range
   (let [r (srange 3 3 (range 5))
-        f (future (c/peek! r))]
+        f (future (c/pop! r))]
     (Thread/sleep 2)
     (?false (realized? f))
     (r/expand! 1 r)
@@ -236,14 +236,14 @@
 
 (deftest peeking-item-from-empty-range-with-timeout
   (let [r (srange 3 3 (range 5))]
-    (let [f (future (c/peek! r :timeout 3))]
+    (let [f (future (c/pop! r :timeout 3))]
       (Thread/sleep 1)
       (?false (realized? f))
       (Thread/sleep 4)
       (?true (realized? f))
       (?range= r [3 3])
       (?= @f nil))
-    (let [f (future (c/peek! r :timeout 1000))]
+    (let [f (future (c/pop! r :timeout 1000))]
       (Thread/sleep 2)
       (?false (realized? f))
       (r/expand! 1 r)
