@@ -117,3 +117,73 @@
     (?range= (s/reader s) [0 10])
     (?range= (s/writer s) [0 0])
     (?= (seq s) (seq (range -5 5)))))
+
+(deftest pushing-to-sequence
+  (let [s (s/sequence 3)]
+    (?= (c/push! s 123) s)
+    (?= (c/push! s 234 :timeout 0) s)
+    (?= (c/push! s 345 :timeout 10) s)
+    (?= (seq s) [123 234 345])))
+
+(deftest pushing-to-full-sequence
+  (let [s (s/sequence 1 :reader [0 0] :writer [0 0])
+        f (future (c/push! s 123))]
+    (Thread/sleep 2)
+    (?false (realized? f))
+    (.expand (.writer s) 1)
+    (?= @f s)))
+
+(deftest pushing-to-full-sequence-with-zero-timeout
+  (let [s (s/sequence 1 :writer [0 0])]
+    (?= (c/push! s 123 :timeout 0) nil)))
+
+(deftest pushing-to-full-sequence-with-timeout
+  (let [s (s/sequence 0)
+        f (future (c/push! s 123 :timeout 4))]
+    (Thread/sleep 1)
+    (?false (realized? f))
+    (Thread/sleep 4)
+    (?true (realized? f))
+    (?= @f nil)))
+
+(deftest popping-from-sequence
+  (let [s (s/wrap [1 2 3])]
+    (?= (c/pop! s) 1)
+    (?= (c/pop! s :timeout 0) 2)
+    (?= (c/pop! s :timeout 10) 3)
+    (?range= (.writer s) [3 3])))
+
+(deftest popping-from-circular-sequence
+  (let [s (s/sequence (b/wrap [1 2 3] {:circular true}) :reader [0 3] :writer [0 0])]
+    (?= (c/pop! s) 1)
+    (?= (c/pop! s :timeout 0) 2)
+    (?= (c/pop! s :timemout 10) 3)
+    (?range= (.writer s) [0 3])))
+
+(deftest popping-from-full-sequence-with-zero-timeout
+  (let [s (s/sequence 0)]
+    (?= (c/pop! s :timeout 0) nil)))
+
+(deftest popping-from-full-sequence
+  (let [s (s/sequence (b/wrap [0]) :reader [0 0] :writer [1 1])
+        f (future (c/pop! s))]
+    (Thread/sleep 2)
+    (?false (realized? f))
+    (r/expand! 1 (.reader s))
+    (?= @f 0)))
+
+(deftest popping-from-full-sequence-with-timeout
+  (let [s (s/sequence (b/wrap [0]) :reader [0 0] :writer [1 1])
+        f (future (c/pop! s :timeout 5))]
+    (Thread/sleep 2)
+    (?false (realized? f))
+    (Thread/sleep 4)
+    (?true (realized? f))
+    (?= @f nil)))
+
+
+
+    
+    
+
+

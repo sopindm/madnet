@@ -14,15 +14,23 @@
   (clone [this] (Sequence. buffer (.clone reader) (.clone writer) circular?))
   (close [this] nil)
   (isOpen [this] true)
+  (push [this obj] (.push writer obj) (.expand reader 1))
+  (push [this obj timeout] (boolean (when (.push writer obj timeout) (.expand reader 1) this)))
+  (tryPush [this obj] (boolean (when (.tryPush writer obj) (.expand reader 1) true)))
+  (pop [this] (let [result (.pop reader)]
+                (when circular? (.expand writer 1)) result))
+  (pop [this timeout] (when-let [result (.pop reader timeout)]
+                        (when circular? (.expand writer 1)) result))
+  (tryPop [this] (when-let [result (.tryPop reader)]
+                   (when circular? (.expand writer 1)) result))
   (write [this channel]
-    (let [writer (.writer this)]
-      (when-let [result (or (.write writer channel) (.read channel writer))]
-        (.expand (.reader this) (.read result))
-        result)))
+    (when-let [result (or (.write writer channel) (.read channel writer))]
+      (.expand reader (.read result))
+      result))
   (read [this channel]
     (let [reader (.reader this)]
       (when-let [result (or (.read reader channel) (.write channel reader))]
-        (when circular? (.expand (.writer this) (.writen result)))
+        (when circular? (.expand writer (.writen result)))
         result))))
 
 (defn- buffer- [buffer-or-spec]
