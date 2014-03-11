@@ -1,5 +1,5 @@
 (ns madnet.channel
-  (:refer-clojure :exclude [read])
+  (:refer-clojure :exclude [read pop!])
   (:require [madnet.channel.pipe])
   (:import [madnet.channel IChannel]
            [madnet.event ISignalSet]))
@@ -34,6 +34,21 @@
         writen (.clone src)]
     (read! read writen)
     [read writen]))
+
+(defn push! [ch obj & {timeout :timeout}]
+  (letfn [(try-push- [] (if (.tryPush ch obj) ch))
+          (push- [] (do (.push ch obj) ch))
+          (push-with-timeout- [] (if (.push ch obj timeout) ch))]
+    (if timeout (if (zero? timeout) (try-push-) (push-with-timeout-))
+      (push-))))
+
+(defn pop! [ch & args] (.pop ch) ch)
+
+(defn peek! [ch & args] (.peek ch) ch)
+
+;;
+;; Wrappers
+;;
 
 (def pipe madnet.channel.pipe/pipe)
 

@@ -27,7 +27,16 @@
   (?throws (c/read! (irange 0 1) (irange 5 10))
            UnsupportedOperationException)
   (?throws (c/write! (irange 2 10) (irange 5 10))
-           UnsupportedOperationException))
+           UnsupportedOperationException)
+  (?throws (c/push! (irange 0 10) []) UnsupportedOperationException)
+  (?throws (c/push! (irange 0 10) [] :timeout 0) UnsupportedOperationException)
+  (?throws (c/push! (irange 0 10) [] :timeout 10) UnsupportedOperationException)
+  (?throws (c/peek! (irange 0 10)) UnsupportedOperationException)
+  (?throws (c/peek! (irange 0 10) :timeout 0) UnsupportedOperationException)
+  (?throws (c/peek! (irange 0 10) :timeout 10) UnsupportedOperationException)
+  (?throws (c/pop! (irange 0 10)) UnsupportedOperationException)
+  (?throws (c/pop! (irange 0 10) :timeout 0) UnsupportedOperationException)
+  (?throws (c/pop! (irange 0 10) :timeout 10) UnsupportedOperationException))
 
 (deftest range-mutable-take-drop-and-expand
   (let [r (irange 5 10)]
@@ -90,6 +99,13 @@
            [begin end]
       (seq [] (seq (->> @coll (take (.end ^IntegerRange this)) (drop (.begin ^IntegerRange this)))))
       (count [] (r/size this))
+      (tryPush [obj]
+        (boolean (when (pos? (count this))
+                   (swap! coll #(concat (take (.begin this) %)
+                                        [obj]
+                                        (drop (inc (.begin this)) %)))
+                   (r/drop! 1 this)
+                   true)))
       (write [src] (writer this src))
       (read [ts] nil)
       (iterator [] (.iterator (or (seq this) []))))))
@@ -144,3 +160,53 @@
       (?range= writen [3 3])
       (?= (seq r1) [3 nil nil])
       (?= (seq r2) [3 nil nil]))))
+
+(deftest pushing-item-to-range
+  (let [r (srange 0 5 (repeat 5 nil))
+        rc (.clone r)]
+    (?= (c/push! r 1) r)
+    (?range= r [1 5])
+    (?= (first (seq rc)) 1)
+    (?= (c/push! r 2 :timeout 0) r)
+    (?range= r [2 5])
+    (?= (second (seq rc)) 2)
+    (?= (c/push! r 3 :timeout 10) r)
+    (?range= r [3 5])
+    (?= (nth (seq rc) 2) 3)))
+
+(deftest pushing-item-to-full-range-with-zero-timeout
+  (let [r (srange 3 3 (repeat 5 nil))]
+    (?= (c/push! r 1 :timeout 0) nil)))
+
+(deftest pushing-item-to-full-range
+  (let [r (srange 3 3 (repeat 5 nil))
+        rc (.clone r)]
+    (let [f (future (c/push! r 1))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (r/expand! 1 r)
+      (Thread/sleep 1)
+      (?true (realized? f))
+      (?range= r [4 4])
+      (?= (first (seq (r/expand 1 rc))) 1)
+      (future-cancel f))))
+
+(deftest pushing-item-to-full-range-with-timeout
+  (let [r (srange 3 3 (repeat 5 nil))
+        rc (.clone r)]
+    (let [f (future (c/push! r 1 :timeout 3))]
+      (Thread/sleep 1)
+      (?false (realized? f))
+      (Thread/sleep 4)
+      (?true (realized? f))
+      (?range= r [3 3]))
+    (let [f (future (c/push! r 1 :timeout 1000))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (r/expand! 1 r)
+      (Thread/sleep 1)
+      (?true (realized? f))
+      (?= (first (seq (r/expand 1 rc))) 1)
+      (?range= r [4 4])
+      (?= @f r))))
+

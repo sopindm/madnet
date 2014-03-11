@@ -4,7 +4,7 @@ import madnet.channel.IChannel;
 import madnet.channel.Result;
 import madnet.channel.Events;
 
-abstract public class Range implements IChannel, Iterable
+abstract public class Range extends madnet.channel.Channel implements Iterable
 {
     protected Range() {
     }
@@ -87,6 +87,21 @@ abstract public class Range implements IChannel, Iterable
 
     @Override
     public java.util.Iterator iterator() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean tryPush(Object object) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Object tryPop() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Object tryPeek() {
         throw new UnsupportedOperationException();
     }
 }
