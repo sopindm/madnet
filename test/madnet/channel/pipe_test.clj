@@ -67,6 +67,8 @@
     (with-open [pipe p])
     (?false (c/open? p))))
 
+;writing to reader and reading from writer
+
 ;;
 ;; Events
 ;;
@@ -76,8 +78,7 @@
     (let [e (c/events p)
           s (e/event-set)]
       (c/register p s)
-      (?= (set (e/signals s))
-          #{(.onRead e) (.onWrite e)}))))
+      (?= (set (e/signals s)) #{(.onRead e) (.onWrite e)}))))
 
 (deftest registering-pipe-reader-and-writer
   (with-open [pipe (c/pipe)]
@@ -111,8 +112,8 @@
   (with-open [pipe (c/pipe)]
     (let [a (atom [])
           s (e/event-set)
-          on-read-closed (-> pipe .reader .events :on-close)
-          on-write-closed (-> pipe .writer .events :on-close)
+          on-read-closed (-> pipe .reader .events .onClose)
+          on-write-closed (-> pipe .writer .events .onClose)
           on-closed (-> pipe .events :on-close)
           e (e/event ([e s] (swap! a conj {:e e :s s}))
                      on-read-closed on-write-closed on-closed)]
@@ -131,8 +132,8 @@
       (.close s)))
   (let [a (atom [])
         pipe (c/pipe)
-        on-read-closed (-> pipe .reader .events :on-close)
-        on-write-closed (-> pipe .writer .events :on-close)
+        on-read-closed (-> pipe .reader .events .onClose)
+        on-write-closed (-> pipe .writer .events .onClose)
         on-closed (-> pipe .events :on-close)
         s (e/event-set)
         e (e/event ([_ s] (swap! a conj s))
@@ -155,12 +156,12 @@
   (let [p (c/pipe)
         a (atom [])
         h (e/handler ([_ s] (swap! a conj s))
-                     (-> p .reader .events :on-close))
+                     (-> p .reader .events .onClose))
         s (e/event-set)]
     (c/register p s)
     (.close (.writer p))
     (?= (seq (e/select s :timeout 0))
-        [(-> p .reader .events :on-read)])
+        [(-> p .reader .events .onRead)])
     (c/write (s/sequence [10 :element :byte]) p)
     (?= (seq @a) [(.reader p)])))
 
@@ -168,11 +169,16 @@
   (let [p (c/pipe)
         a (atom [])
         h (e/handler ([_ s] (swap! a conj s))
-                     (-> p .writer .events :on-close))
+                     (-> p .writer .events .onClose))
         s (e/event-set)]
     (c/register p s)
     (.close (.reader p))
-    (?= (seq (e/select s :timeout 0)) [(-> p .writer .events :on-write)])
+    (?= (seq (e/select s :timeout 0)) [(-> p .writer .events .onWrite)])
     (c/write p (s/wrap (byte-array 10)))
     (?= (seq @a) [(.writer p)])))
+
+;pushing to pipe
+;pushing to full pipe
+;popping from pipe
+;popping from empty pipe
 
