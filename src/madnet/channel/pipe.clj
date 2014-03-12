@@ -2,7 +2,7 @@
   (:require [madnet.event :as e])
   (:require [madnet.channel.events :as ce])
   (:import [madnet.channel IChannel Result Events]
-           [madnet.channel PipeReader PipeWriter]))
+           [madnet.channel WritableChannel ReadableChannel]))
 
 (deftype Pipe [reader writer events]
   IChannel
@@ -22,8 +22,8 @@
 
 (defn pipe ^madnet.channel.pipe.Pipe []
   (let [pipe (java.nio.channels.Pipe/open)
-        reader (PipeReader. pipe)
-        writer (PipeWriter. pipe)
+        reader (ReadableChannel. (.source pipe))
+        writer (WritableChannel. (.sink pipe))
         on-close (e/when-every (-> reader .events .onClose)
                                (-> writer .events .onClose))]
     (let [pipe (Pipe. reader writer
