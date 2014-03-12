@@ -2,7 +2,7 @@
   (:require [madnet.event :as e])
   (:require [madnet.channel.events :as ce])
   (:import [madnet.channel IChannel Result Events]
-           [madnet.channel.pipe PipeReader PipeWriter]))
+           [madnet.channel PipeReader PipeWriter]))
 
 (deftype Pipe [reader writer events]
   IChannel

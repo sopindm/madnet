@@ -1,4 +1,4 @@
-package madnet.channel.pipe;
+package madnet.channel;
 
 import madnet.event.Event;
 import madnet.event.ISignal;
@@ -8,25 +8,25 @@ import madnet.channel.Result;
 import madnet.channel.Events;
 import madnet.range.nio.ByteRange;
 
-public class PipeReader extends madnet.channel.Channel {
-    private java.nio.channels.Pipe.SourceChannel channel = null;
+public class PipeWriter extends madnet.channel.Channel {
+    private java.nio.channels.Pipe.SinkChannel channel = null;
     private Events events = null;
 
-    public PipeReader(java.nio.channels.Pipe pipe)
+    public PipeWriter(java.nio.channels.Pipe pipe)
         throws java.io.IOException {
-        channel = pipe.source();
+        channel = pipe.sink();
         channel.configureBlocking(false);
 
-        ISignal onRead =
-            new SelectorSignal(pipe.source(),
-                               java.nio.channels.SelectionKey.OP_READ);
-        onRead.attach(this);
+        ISignal onWrite =
+            new SelectorSignal(pipe.sink(),
+                               java.nio.channels.SelectionKey.OP_WRITE);
+        onWrite.attach(this);
 
         Event onClose = new Event();
         onClose.oneShot(true);
         onClose.attach(this);
 
-        events = new Events(onRead, null, onClose);
+        events = new Events(null, onWrite, onClose);
     }
 
     @Override
@@ -36,7 +36,7 @@ public class PipeReader extends madnet.channel.Channel {
 
     @Override
     public void close() throws java.io.IOException {
-        events().onRead().close();
+        events().onWrite().close();
         channel.close();
 
         try {
@@ -48,8 +48,8 @@ public class PipeReader extends madnet.channel.Channel {
     }
 
     @Override
-    public PipeReader clone() throws CloneNotSupportedException {
-        return (PipeReader)super.clone();
+    public PipeWriter clone() throws CloneNotSupportedException {
+        return (PipeWriter)super.clone();
     }
 
     @Override
@@ -59,30 +59,39 @@ public class PipeReader extends madnet.channel.Channel {
 
     @Override 
     public void register(madnet.event.ISignalSet set) throws Exception {
-        set.conj(events().onRead());
-        events().onRead().emit();
+        set.conj(events().onWrite());
+        events().onWrite().emit();
     }
 
     @Override
     public boolean tryPush(Object obj) throws Exception {
-        throw new UnsupportedOperationException();
+        if(!(obj instanceof Byte))
+            throw new IllegalArgumentException();
+
+        byte[] bytes = new byte[1];
+        bytes[0] = (byte)obj;
+
+        java.nio.ByteBuffer src = java.nio.ByteBuffer.wrap(bytes);
+        channel.write(src);
+
+        if(src.limit() - src.position() > 0)
+            return false;
+
+        return true;
     }
 
     @Override
     public Object tryPop() throws Exception {
-        byte[] bytes = new byte[1];
-
-        java.nio.ByteBuffer src = java.nio.ByteBuffer.wrap(bytes);
-        channel.read(src);
-
-        if(src.limit() - src.position() > 0)
-            return null;
-
-        return bytes[0];
+        throw new UnsupportedOperationException();
     }
 
     @Override
-    public Result read(IChannel ch) throws Exception {
+    public Result read(IChannel ch) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Result write(IChannel ch) throws Exception {
         if(!isOpen())
             throw new java.nio.channels.ClosedChannelException();
 
@@ -94,15 +103,13 @@ public class PipeReader extends madnet.channel.Channel {
         java.nio.ByteBuffer buffer = range.buffer();
         int begin = buffer.position();
 
-        if(channel.read(buffer) < 0)
+        try {
+            channel.write(buffer);
+        } catch(java.io.IOException e) {
             close();
+        }
 
         return new Result(buffer.position() - begin,
                           buffer.position() - begin);
-    }
-
-    @Override
-    public Result write(IChannel ch) {
-        throw new UnsupportedOperationException();
     }
 }

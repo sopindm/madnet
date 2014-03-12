@@ -6,4 +6,3 @@
             [madnet.event :as e]
             [khazad-dum :refer :all])
   (:import [madnet.channel Result]))
-

@@ -1,5 +1,6 @@
-package madnet.channel.pipe;
+package madnet.channel;
 
+import java.nio.channels.WritableByteChannel;
 import madnet.event.Event;
 import madnet.event.ISignal;
 import madnet.event.SelectorSignal;
@@ -8,59 +9,28 @@ import madnet.channel.Result;
 import madnet.channel.Events;
 import madnet.range.nio.ByteRange;
 
-public class PipeWriter extends madnet.channel.Channel {
-    private java.nio.channels.Pipe.SinkChannel channel = null;
-    private Events events = null;
+public class WritableChannel<T extends java.nio.channels.SelectableChannel &
+                                       WritableByteChannel> 
+    extends SelectableChannel<T> {
+    public WritableChannel(T ch) throws java.io.IOException {
+        super(ch);
 
-    public PipeWriter(java.nio.channels.Pipe pipe)
-        throws java.io.IOException {
-        channel = pipe.sink();
-        channel.configureBlocking(false);
-
-        ISignal onWrite =
-            new SelectorSignal(pipe.sink(),
+        ISignal onWrite = 
+            new SelectorSignal(ch, 
                                java.nio.channels.SelectionKey.OP_WRITE);
         onWrite.attach(this);
-
-        Event onClose = new Event();
-        onClose.oneShot(true);
-        onClose.attach(this);
-
-        events = new Events(null, onWrite, onClose);
+        events.onWrite(onWrite);
     }
 
     @Override
-    public boolean isOpen() {
-        return channel.isOpen();
-    }
-
-    @Override
-    public void close() throws java.io.IOException {
-        events().onWrite().close();
-        channel.close();
-
-        try {
-            events().onClose().emit();
-        }
-        catch(Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public PipeWriter clone() throws CloneNotSupportedException {
-        return (PipeWriter)super.clone();
-    }
-
-    @Override
-    public Events events() {
-        return events;
+    public WritableChannel clone() throws CloneNotSupportedException {
+        return (WritableChannel)super.clone();
     }
 
     @Override 
     public void register(madnet.event.ISignalSet set) throws Exception {
-        set.conj(events().onWrite());
-        events().onWrite().emit();
+        set.conj(events.onWrite());
+        events.onWrite().emit();
     }
 
     @Override
@@ -78,16 +48,6 @@ public class PipeWriter extends madnet.channel.Channel {
             return false;
 
         return true;
-    }
-
-    @Override
-    public Object tryPop() throws Exception {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Result read(IChannel ch) {
-        throw new UnsupportedOperationException();
     }
 
     @Override
