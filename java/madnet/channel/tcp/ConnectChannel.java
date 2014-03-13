@@ -12,13 +12,19 @@ import madnet.event.ISignalSet;
 
 public class ConnectChannel extends SelectableChannel<SocketChannel>
 {
-    boolean connected;
+    boolean connected = false;
 
     public ConnectChannel(SocketChannel ch, SocketAddress remote)
         throws Exception {
         super(ch);
 
         connected = ch.connect(remote);
+    }
+
+    @Override
+    public boolean isOpen() {
+        if(channel == null) return false;
+        return super.isOpen();
     }
 
     @Override
@@ -39,7 +45,11 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
         if(!tryConnect())
             return null;
 
-        return new Socket(channel);
+        Socket result = new Socket(channel);
+        channel = null;
+        close();
+
+        return result;
     }
 
     @Override
@@ -48,8 +58,12 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
             return Result.ZERO;
 
         try {
-            if(ch.tryPush(new Socket(channel)))
+            if(ch.tryPush(new Socket(channel))) {
+                channel = null;
+                close();
+
                 return Result.ONE;
+            }
         }
         catch(IllegalArgumentException e) {
             return null;

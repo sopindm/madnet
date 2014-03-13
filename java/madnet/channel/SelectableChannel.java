@@ -43,7 +43,8 @@ public abstract class SelectableChannel<T extends java.nio.channels.SelectableCh
         }
 
         try {
-            channel.close();
+            if(channel != null)
+                channel.close();
         }
         catch(Exception e) {
             if(exception == null)

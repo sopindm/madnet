@@ -54,7 +54,7 @@ public class AcceptChannel extends SelectableChannel<ServerSocketChannel>
         try {
             if(ch.tryPush(preAccepted)) {
                 preAccepted = null;
-                return Result.ONE;
+                return Result.ONE.add(read(ch));
             }
         }
         catch(IllegalArgumentException e) {

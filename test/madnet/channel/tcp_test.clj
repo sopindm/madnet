@@ -1,5 +1,6 @@
 (ns madnet.channel.tcp-test
   (:require [khazad-dum :refer :all]
+            [madnet.range :as r]
             [madnet.sequence :as s]
             [madnet.channel :as c]
             [madnet.channel.tcp :as t])
@@ -64,12 +65,46 @@
       (doall (map #(if % (.close %)) sockets))
       (doall (map #(.close %) connectors)))))
 
-;writing to full sequence from acceptor
-;writing several sockets from acceptor
-;popping twice from acceptor (and after read)
+(defmacro ?socket [expr]
+  `(with-open [socket# ~expr] 
+     (?true (instance? ISocket socket#))))
 
-;successfull connector is closed
-;accept several times
+(deftest writing-to-full-sequence
+  (let [s (s/sequence 0)]
+    (with-tcp [acceptor connector]
+      (c/write! s acceptor)
+      (?socket (c/pop! acceptor))
+      (c/write! s connector)
+      (?socket (c/pop! connector)))))
+
+(deftest accept-several-times
+  (with-tcp [acceptor connector]
+    (with-open [connector (t/connect :host "localhost" :port 12345)
+                connector (t/connect :host "localhost" :port 12345)
+                connector (t/connect :host "localhost" :port 12345)
+                connector (t/connect :host "localhost" :port 12345)
+                connector (t/connect :host "localhost" :port 12345)
+                connector (t/connect :host "localhost" :port 12345)]
+      (?socket (c/pop! acceptor))
+      (?socket (c/pop! acceptor))
+      (let [s (s/sequence 1)]
+        (c/write! s acceptor)
+        (?socket (c/pop! s :timeout 0))
+        (c/write! s acceptor)
+        (?socket (c/pop! s :timeout 0)))
+      (let [s (s/sequence 2)]
+        (?= (c/write! s acceptor) (madnet.channel.Result. 2 2))
+        (?socket (c/pop! s :timeout 0))
+        (?socket (c/pop! s :timeout 0))))))
+
+(deftest successful-connector-is-closed
+  (with-tcp [acceptor connector]
+    (?true (c/open? connector))
+    (with-open [s (c/pop! connector)]
+      (?false (c/open? connector))
+      (?true (c/open? (.reader s)))
+      (?true (c/open? (.writer s))))))
+
 ;closing acceptor and connector (try reuse address)
 ;acceptor backlog and reuse_address
 ;connector local address
