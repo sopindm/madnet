@@ -20,24 +20,42 @@ public class AcceptChannel extends SelectableChannel<ServerSocketChannel>
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Object tryPop() throws Exception {
-        SocketChannel socket = channel.accept();
-        return new Socket(socket);
+    Socket preAccepted = null;
+
+    private boolean tryFetch() throws Exception {
+        if(preAccepted != null)
+            return true;
+
+        SocketChannel accepted = channel.accept();
+
+        if(accepted != null)
+            preAccepted = new Socket(accepted);
+
+        return accepted != null;
     }
 
-    Socket preAccepted = null;
+    @Override
+    public Object tryPop() throws Exception {
+        if(!tryFetch())
+            return null;
+
+        Socket result = preAccepted;
+        preAccepted = null;
+
+        return result;
+    }
+
 
     @Override
     public Result read(IChannel ch) throws Exception {
-        if(preAccepted == null)
-            preAccepted = new Socket(channel.accept());
-
-        if(preAccepted == null)
-            return null;
+        if(!tryFetch())
+            return Result.ZERO;
 
         try {
-            if(ch.tryPush(preAccepted)) return Result.ONE;
+            if(ch.tryPush(preAccepted)) {
+                preAccepted = null;
+                return Result.ONE;
+            }
         }
         catch(IllegalArgumentException e) {
             return null;

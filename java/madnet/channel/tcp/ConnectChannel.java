@@ -27,17 +27,16 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
     }
     
     private boolean tryConnect() throws java.io.IOException {
+        if(connected)
+            return true;
+
         connected = channel.finishConnect();
         return connected;
     }
 
     @Override
     public Object tryPop() throws Exception {
-        if(!connected) {
-            connected = channel.finishConnect();
-        }
-
-        if(!connected)
+        if(!tryConnect())
             return null;
 
         return new Socket(channel);
@@ -45,8 +44,8 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
 
     @Override
     public Result read(IChannel ch) throws Exception {
-        if(!connected && !tryConnect())
-            return null;
+        if(!tryConnect())
+            return Result.ZERO;
 
         try {
             if(ch.tryPush(new Socket(channel)))
