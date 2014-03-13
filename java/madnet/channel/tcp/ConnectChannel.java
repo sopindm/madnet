@@ -3,9 +3,11 @@ package madnet.channel.tcp;
 import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import madnet.channel.IChannel;
 import madnet.channel.SelectableChannel;
 import madnet.channel.ReadableChannel;
 import madnet.channel.WritableChannel;
+import madnet.channel.Result;
 import madnet.event.ISignalSet;
 
 public class ConnectChannel extends SelectableChannel<SocketChannel>
@@ -24,6 +26,11 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
         throw new UnsupportedOperationException();
     }
     
+    private boolean tryConnect() throws java.io.IOException {
+        connected = channel.finishConnect();
+        return connected;
+    }
+
     @Override
     public Object tryPop() throws Exception {
         if(!connected) {
@@ -33,10 +40,22 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
         if(!connected)
             return null;
 
-        ArrayList<SelectableChannel> ret = new ArrayList<SelectableChannel>(2);
-        ret.add(new ReadableChannel<SocketChannel>(channel));
-        ret.add(new WritableChannel<SocketChannel>(channel));
+        return new Socket(channel);
+    }
 
-        return ret;
+    @Override
+    public Result read(IChannel ch) throws Exception {
+        if(!connected && !tryConnect())
+            return null;
+
+        try {
+            if(ch.tryPush(new Socket(channel)))
+                return Result.ONE;
+        }
+        catch(IllegalArgumentException e) {
+            return null;
+        }
+
+        return Result.ZERO;
     }
 }

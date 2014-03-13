@@ -9,6 +9,9 @@ public final class Result {
         this.writen = writen;
     }
 
+    public static Result ZERO = new Result(0, 0);
+    public static Result ONE = new Result(1, 1);
+
     @Override
     public boolean equals(Object obj) {
         if(!(obj instanceof Result))
