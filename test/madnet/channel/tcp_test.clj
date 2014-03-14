@@ -5,7 +5,7 @@
             [madnet.sequence :as s]
             [madnet.channel :as c]
             [madnet.channel.tcp :as t])
-  (:import [madnet.channel ISocket]))
+  (:import [madnet.channel ISocket ReadableChannel WritableChannel]))
 
 (defmacro with-tcp [[acceptor connector] & body]
   (let [acceptor-options (if (sequential? acceptor) (rest acceptor)
@@ -134,7 +134,37 @@
         (c/register connector s)
         (e/do-selections [e s :timeout 0] (.handle e))
         (?= (set @actions) #{:write1 :write2})))))
+
+(deftest accepted-and-connected-sockets-are-a-readable-writable-pairs
+  (with-tcp [acceptor connector]
+    (with-open [ssocket (c/pop! acceptor)
+                csocket (c/pop! connector)]
+      (?true (instance? ReadableChannel (.reader ssocket)))
+      (?true (instance? WritableChannel (.writer ssocket)))
+      (?true (instance? ReadableChannel (.reader csocket)))
+      (?true (instance? WritableChannel (.writer csocket))))))
       
-      
+(deftest closing-accepted-and-connected-sockets
+  (with-tcp [acceptor connector]
+    (let [ssocket (c/pop! acceptor)
+          csocket (c/pop! connector)]
+      (.close (.reader ssocket))
+      (?true (c/open? (.writer ssocket)))
+      (.close (.writer ssocket))
+      (?false (c/open? (.writer ssocket)))
+      (.close (.writer csocket))
+      (?true (c/open? (.reader csocket)))
+      (.close (.reader csocket))
+      (?false (c/open? (.reader csocket))))))
+
+(deftest acceptor-and-connector-socket-address
+  (with-tcp [(acceptor :host "127.0.0.1" :port 12345)
+             (connector :host "127.0.0.1" :port 12345)]
+    (with-open [socket (c/pop! acceptor)]
+      (?= (t/address (.reader socket)) {:host "localhost"
+                                        :ip "127.0.0.1"
+                                        :port 12345})
+      (?= (:host (t/remote-address (.reader socket))) "localhost")
+      (?= (:host (t/remote-address (.writer socket))) "localhost"))))
 
       
