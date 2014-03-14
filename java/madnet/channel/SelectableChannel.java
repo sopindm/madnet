@@ -26,6 +26,8 @@ public abstract class SelectableChannel<T extends java.nio.channels.SelectableCh
         events = new Events(null, null, onClose);
     }
 
+    public T channel() { return channel; }
+
     @Override
     public boolean isOpen() {
         return channel.isOpen();

@@ -9,6 +9,7 @@ import madnet.channel.ReadableChannel;
 import madnet.channel.WritableChannel;
 import madnet.channel.Result;
 import madnet.event.ISignalSet;
+import madnet.event.SelectorSignal;
 
 public class ConnectChannel extends SelectableChannel<SocketChannel>
 {
@@ -17,6 +18,8 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
     public ConnectChannel(SocketChannel ch, SocketAddress remote)
         throws Exception {
         super(ch);
+
+        events.onWrite(new SelectorSignal(ch, java.nio.channels.SelectionKey.OP_CONNECT));
 
         connected = ch.connect(remote);
     }
@@ -28,8 +31,9 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
     }
 
     @Override
-    public void register(ISignalSet set) {
-        throw new UnsupportedOperationException();
+    public void register(ISignalSet set) throws Exception {
+        set.conj(events.onWrite());
+        events.onWrite().emit();
     }
     
     private boolean tryConnect() throws java.io.IOException {

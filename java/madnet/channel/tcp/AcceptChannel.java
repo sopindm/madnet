@@ -8,16 +8,20 @@ import madnet.channel.ReadableChannel;
 import madnet.channel.WritableChannel;
 import madnet.channel.SelectableChannel;
 import madnet.event.ISignalSet;
+import madnet.event.SelectorSignal;
 
 public class AcceptChannel extends SelectableChannel<ServerSocketChannel>
 {
     public AcceptChannel(ServerSocketChannel ch) throws Exception {
         super(ch);
+
+        events.onWrite(new SelectorSignal(ch, java.nio.channels.SelectionKey.OP_ACCEPT));
     }
 
     @Override
-    public void register(ISignalSet set) {
-        throw new UnsupportedOperationException();
+    public void register(ISignalSet set) throws Exception {
+        set.conj(events.onWrite());
+        events.onWrite().emit();
     }
 
     Socket preAccepted = null;

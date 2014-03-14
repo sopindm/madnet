@@ -67,7 +67,12 @@
     (with-open [pipe p])
     (?false (c/open? p))))
 
-;writing to reader and reading from writer
+(deftest writing-to-reader-and-reading-from-writer
+  (with-open [pipe (c/pipe)]
+    (?throws (c/write! (.reader pipe) (s/sequence 10))
+             UnsupportedOperationException)
+    (?throws (c/read! (.writer pipe) (s/sequence 10))
+             UnsupportedOperationException)))
 
 ;;
 ;; Events
