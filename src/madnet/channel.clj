@@ -51,4 +51,4 @@
 ;;
 
 (def pipe madnet.channel.pipe/pipe)
-
+(def object-pipe madnet.channel.pipe/object-pipe)
