@@ -2,23 +2,28 @@ package madnet.channel;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.nio.channels.Pipe;
+import madnet.event.ISignalSet;
 
-public class ObjectReader extends ReadableChannel<Pipe.SourceChannel> {
+public class ObjectReader extends AChannel {
     ConcurrentLinkedQueue<Object> wire;
+    boolean isOpen = true;
 
-    public ObjectReader(Pipe.SourceChannel selectable,
-                        ConcurrentLinkedQueue<Object> wire)
-        throws Exception {
-        super(selectable);
+    @Override
+    public boolean isOpen() {
+        return isOpen;
+    }
 
+    public ObjectReader(ConcurrentLinkedQueue<Object> wire) throws Exception {
         this.wire = wire;
     }
 
     @Override
+    public void register(ISignalSet set) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public Object tryPop() throws Exception {
-        if(super.tryPop() == null)
-            return false;
-            
-        return wire.remove();
+        return wire.poll();
     }
 }

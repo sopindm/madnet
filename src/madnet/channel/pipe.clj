@@ -36,10 +36,9 @@
       pipe)))
 
 (defn object-pipe ^madnet.channel.pipe.Pipe []
-  (let [pipe (java.nio.channels.Pipe/open)
-        queue (java.util.concurrent.ConcurrentLinkedQueue.)
-        reader (ObjectReader. (.source pipe) queue)
-        writer (ObjectWriter. (.sink pipe) queue)
+  (let [queue (java.util.concurrent.ConcurrentLinkedQueue.)
+        reader (ObjectReader. queue)
+        writer (ObjectWriter. queue)
         on-close (e/when-every (-> reader .events .onClose)
                                (-> writer .events .onClose))]
     (let [pipe (Pipe. reader writer

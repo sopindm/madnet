@@ -2,22 +2,28 @@ package madnet.channel;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.nio.channels.Pipe;
+import madnet.event.ISignalSet;
 
-public class ObjectWriter extends WritableChannel<Pipe.SinkChannel> {
+public class ObjectWriter extends AChannel {
     ConcurrentLinkedQueue<Object> wire;
+    boolean isOpen = true;
 
-    public ObjectWriter(Pipe.SinkChannel selectable,
-                        ConcurrentLinkedQueue<Object> wire)
-        throws Exception {
-        super(selectable);
+    @Override
+    public boolean isOpen() {
+        return isOpen;
+    }
 
+    public ObjectWriter(ConcurrentLinkedQueue<Object> wire) throws Exception {
+        super();
         this.wire = wire;
     }
 
+    @Override
+    public void register(ISignalSet set) {
+        throw new UnsupportedOperationException();
+    }
+
     public boolean tryPush(Object o) throws Exception {
-        if(!super.tryPush((byte)0))
-            return false;
-            
         wire.add(o);
         return true;
     }

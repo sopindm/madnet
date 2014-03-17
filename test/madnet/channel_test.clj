@@ -13,5 +13,5 @@
     (?= (c/pop! p) [123 456])))
 
 ;writing/reading to/from object pipe
-
+;object pipe size (default in unlimited)
 
