@@ -35,10 +35,30 @@
       (e/attach! (-> pipe .events :on-close) pipe)
       pipe)))
 
-(defn object-pipe ^madnet.channel.pipe.Pipe []
-  (let [queue (java.util.concurrent.ConcurrentLinkedQueue.)
-        reader (ObjectReader. queue)
-        writer (ObjectWriter. queue)
+(defn- object-wire
+  ([] (object-wire nil))
+  ([size]
+     (let [current-size (atom 0)
+           deque (java.util.concurrent.ConcurrentLinkedDeque.)]
+       (reify madnet.channel.ObjectWire
+         (push [this obj]
+           (boolean (if (.offer this)
+                      (do (.commitOffer this obj) true)
+                      (.cancelOffer this))))
+         (offer [this]
+           (if (or (nil? size) (< @current-size size))
+             (do (swap! current-size inc) true)
+             false))
+         (cancelOffer [this] (swap! current-size dec) nil)
+         (commitOffer [this obj] (.add deque obj))
+         (pop [this] (.poll deque))
+         (fetch [this] (.pop this))
+         (cancelFetch [this obj] (.addFirst deque obj))
+         (commitFetch [this] true)))))
+
+(defn- object-pipe- [wire]
+  (let [reader (ObjectReader. wire)
+        writer (ObjectWriter. wire)
         on-close (e/when-every (-> reader .events .onClose)
                                (-> writer .events .onClose))]
     (let [pipe (Pipe. reader writer
@@ -47,7 +67,10 @@
                                  :on-close on-close))]
       (e/attach! (-> pipe .events :on-close) pipe)
       pipe)))
-          
+
+(defn object-pipe ^madnet.channel.pipe.Pipe
+  ([] (object-pipe- (object-wire)))
+  ([size] (object-pipe- (object-wire size))))
       
 
 

@@ -4,6 +4,10 @@ public final class Result {
     public final int read;
     public final int writen;
 
+    public Result(int processed) {
+        this(processed, processed);
+    }
+
     public Result(int read, int writen) {
         this.read = read;
         this.writen = writen;

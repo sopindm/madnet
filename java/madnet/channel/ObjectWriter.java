@@ -1,11 +1,11 @@
 package madnet.channel;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Queue;
 import java.nio.channels.Pipe;
 import madnet.event.ISignalSet;
 
 public class ObjectWriter extends AChannel {
-    ConcurrentLinkedQueue<Object> wire;
+    ObjectWire wire;
     boolean isOpen = true;
 
     @Override
@@ -13,7 +13,7 @@ public class ObjectWriter extends AChannel {
         return isOpen;
     }
 
-    public ObjectWriter(ConcurrentLinkedQueue<Object> wire) throws Exception {
+    public ObjectWriter(ObjectWire wire) throws Exception {
         super();
         this.wire = wire;
     }
@@ -24,7 +24,27 @@ public class ObjectWriter extends AChannel {
     }
 
     public boolean tryPush(Object o) throws Exception {
-        wire.add(o);
-        return true;
+        return wire.push(o);
+    }
+
+    public Result write(IChannel ch) throws Exception {
+        int writen = 0;
+
+        if(!wire.offer())
+            return Result.ZERO;
+
+        Object o = ch.tryPop();
+
+        while(o != null) {
+            wire.commitOffer(o);
+            writen++;
+
+            if(!wire.offer())
+                break;
+
+            o = ch.tryPop();
+        }
+            
+        return new Result(writen);
     }
 }

@@ -1,11 +1,11 @@
 package madnet.channel;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Deque;
 import java.nio.channels.Pipe;
 import madnet.event.ISignalSet;
 
 public class ObjectReader extends AChannel {
-    ConcurrentLinkedQueue<Object> wire;
+    ObjectWire wire;
     boolean isOpen = true;
 
     @Override
@@ -13,7 +13,7 @@ public class ObjectReader extends AChannel {
         return isOpen;
     }
 
-    public ObjectReader(ConcurrentLinkedQueue<Object> wire) throws Exception {
+    public ObjectReader(ObjectWire wire) throws Exception {
         this.wire = wire;
     }
 
@@ -24,6 +24,24 @@ public class ObjectReader extends AChannel {
 
     @Override
     public Object tryPop() throws Exception {
-        return wire.poll();
+        return wire.pop();
+    }
+
+    @Override
+    public Result read(IChannel ch) throws Exception {
+        int read = 0;
+        Object o = wire.fetch();
+
+        while(o != null && ch.tryPush(o)) {
+            wire.commitFetch();
+            read++;
+
+            o = wire.pop();
+        }
+
+        if(o != null)
+            wire.cancelFetch(o);
+
+        return new Result(read);
     }
 }
