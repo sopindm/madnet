@@ -5,7 +5,8 @@
             [madnet.sequence :as s]
             [madnet.event :as e]
             [khazad-dum :refer :all])
-  (:import [madnet.channel Result]))
+  (:import [madnet.channel Result]
+           [java.nio.channels ClosedChannelException]))
 
 (deftest making-object-pipe
   (with-open [p (c/object-pipe)]
@@ -36,10 +37,32 @@
     (c/push! p 123)
     (?= (c/push! p 234 :timeout 0) nil)))
 
-;writing to full pipe
+(deftest writing-to-full-pipe
+  (with-open [p (c/object-pipe 1)]
+    (let [s (s/wrap [1 2 3])]
+      (?= (c/write! p s) (Result. 1))
+      (?= (seq s) [2 3])
+      (?= (c/write! p s) (Result. 0))
+      (?= (seq s) [2 3]))))
 
-;object pipe size (default in unlimited, writing/pushing to full pipe)
-;closing object pipe
+;object pipe registering, registering closed pipe
+
+(deftest closing-object-pipe
+  (let [p (c/object-pipe)]
+    (.close p)
+    (?throws (c/push! p 123) java.nio.channels.ClosedChannelException)
+    (?throws (c/pop! p) java.nio.channels.ClosedChannelException)
+    (?throws (c/write! p (s/sequence 10))
+             java.nio.channels.ClosedChannelException)
+    (?throws (c/read! p (s/sequence 10))
+             java.nio.channels.ClosedChannelException)))
+
+;closing object pipe (cannot read/write for closed pipe, pipe onClose event)
+
+;object pipe reader/writer closing
+;reading from closed writer drains buffer and closes
+;writing to closed pipe closed
+
 ;object pipe read/write events
 
 ;thread-safety

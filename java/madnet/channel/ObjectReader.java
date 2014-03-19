@@ -1,6 +1,7 @@
 package madnet.channel;
 
 import java.util.Deque;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.Pipe;
 import madnet.event.ISignalSet;
 
@@ -11,6 +12,16 @@ public class ObjectReader extends AChannel {
     @Override
     public boolean isOpen() {
         return isOpen;
+    }
+
+    @Override
+    public void close() throws java.io.IOException {
+        try {
+            super.close();
+        }
+        finally {
+            isOpen = false;
+        }
     }
 
     public ObjectReader(ObjectWire wire) throws Exception {
@@ -24,11 +35,17 @@ public class ObjectReader extends AChannel {
 
     @Override
     public Object tryPop() throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
+
         return wire.pop();
     }
 
     @Override
     public Result read(IChannel ch) throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
+
         int read = 0;
         Object o = wire.fetch();
 

@@ -1,6 +1,7 @@
 package madnet.channel;
 
 import java.util.Queue;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.Pipe;
 import madnet.event.ISignalSet;
 
@@ -11,6 +12,16 @@ public class ObjectWriter extends AChannel {
     @Override
     public boolean isOpen() {
         return isOpen;
+    }
+
+    @Override
+    public void close() throws java.io.IOException {
+        try {
+        super.close();
+        }
+        finally {
+            isOpen = false;
+        }
     }
 
     public ObjectWriter(ObjectWire wire) throws Exception {
@@ -24,10 +35,16 @@ public class ObjectWriter extends AChannel {
     }
 
     public boolean tryPush(Object o) throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
+
         return wire.push(o);
     }
 
     public Result write(IChannel ch) throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
+
         int writen = 0;
 
         if(!wire.offer())
