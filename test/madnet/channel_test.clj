@@ -35,7 +35,9 @@
 (deftest pushing-to-full-pipe
   (with-open [p (c/object-pipe 1)]
     (c/push! p 123)
-    (?= (c/push! p 234 :timeout 0) nil)))
+    (?= (c/push! p 234 :timeout 0) nil)
+    (?= (c/pop! p) 123)
+    (?= (c/push! p 234 :timeout 0) p)))
 
 (deftest writing-to-full-pipe
   (with-open [p (c/object-pipe 1)]
@@ -45,7 +47,12 @@
       (?= (c/write! p s) (Result. 0))
       (?= (seq s) [2 3]))))
 
-;object pipe registering, registering closed pipe
+(deftest registering-object-pipe
+  (with-open [p (c/object-pipe)
+              s (e/event-set)]
+    (c/register p s)
+    (.close p)
+    (?throws (c/register p s) java.nio.channels.ClosedChannelException)))
 
 (deftest closing-object-pipe
   (let [p (c/object-pipe)]
@@ -56,13 +63,44 @@
              java.nio.channels.ClosedChannelException)
     (?throws (c/read! p (s/sequence 10))
              java.nio.channels.ClosedChannelException)))
+        
+(deftest reading-object-pipe-with-closed-writer
+  (with-open [p (c/object-pipe)]
+    (let [r (.reader p)
+          w (.writer p)]
+      (c/write! w (s/wrap (range 5)))
+      (.close w)
+      (let [s (s/sequence 10)]
+        (c/read! r s)
+        (?= (seq s) (range 5))
+        (?false (c/open? r)))))
+  (with-open [p (c/object-pipe)]
+    (let [r (.reader p)
+          w (.writer p)]
+      (c/push! w 123)
+      (.close w)
+      (?= (c/pop! r) 123)
+      (?true (c/open? r))
+      (?= (c/pop! r :timeout 0) nil)
+      (?false (c/open? r)))))
 
-;closing object pipe (cannot read/write for closed pipe, pipe onClose event)
-
-;object pipe reader/writer closing
-;reading from closed writer drains buffer and closes
-;writing to closed pipe closed
+(deftest writing-to-closed-reader
+  (with-open [p (c/object-pipe)]
+    (let [r (.reader p)
+          w (.writer p)]
+      (c/write! w (s/wrap (range 10)))
+      (.close r)
+      (?= (c/push! w 123 :timeout 0) nil)
+      (?false (c/open? w))))
+  (with-open [p (c/object-pipe)]
+    (let [r (.reader p)
+          w (.writer p)]
+      (.close r)
+      (?= (c/write! w (s/wrap (range 10))) (Result. 0 0))
+      (?false (c/open? w)))))
 
 ;object pipe read/write events
 
 ;thread-safety
+;;multiple producters/consumers (read what was writen, queue is empty at the end)
+;;wire closing visible to other end

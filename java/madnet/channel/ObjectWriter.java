@@ -17,10 +17,11 @@ public class ObjectWriter extends AChannel {
     @Override
     public void close() throws java.io.IOException {
         try {
-        super.close();
+            super.close();
         }
         finally {
             isOpen = false;
+            wire.closeWrite();
         }
     }
 
@@ -30,13 +31,19 @@ public class ObjectWriter extends AChannel {
     }
 
     @Override
-    public void register(ISignalSet set) {
-        throw new UnsupportedOperationException();
+    public void register(ISignalSet set) throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
     }
 
     public boolean tryPush(Object o) throws Exception {
         if(!isOpen)
             throw new ClosedChannelException();
+
+        if(!wire.readable()) {
+            close();
+            return false;
+        }
 
         return wire.push(o);
     }
@@ -44,6 +51,11 @@ public class ObjectWriter extends AChannel {
     public Result write(IChannel ch) throws Exception {
         if(!isOpen)
             throw new ClosedChannelException();
+
+        if(!wire.readable()) {
+            close();
+            return Result.ZERO;
+        }
 
         int writen = 0;
 

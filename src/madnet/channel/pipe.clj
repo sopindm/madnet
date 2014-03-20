@@ -40,21 +40,16 @@
   ([size]
      (let [current-size (atom 0)
            deque (java.util.concurrent.ConcurrentLinkedDeque.)]
-       (reify madnet.channel.ObjectWire
-         (push [this obj]
-           (boolean (if (.offer this)
-                      (do (.commitOffer this obj) true)
-                      (.cancelOffer this))))
-         (offer [this]
+       (proxy [madnet.channel.ObjectWire] []
+         (offer []
            (if (or (nil? size) (< @current-size size))
              (do (swap! current-size inc) true)
              false))
-         (cancelOffer [this] (swap! current-size dec) nil)
-         (commitOffer [this obj] (.add deque obj))
-         (pop [this] (.poll deque))
-         (fetch [this] (.pop this))
-         (cancelFetch [this obj] (.addFirst deque obj))
-         (commitFetch [this] true)))))
+         (cancelOffer [] (swap! current-size dec) nil)
+         (commitOffer [obj] (.add deque obj))
+         (fetch [] (.poll deque))
+         (cancelFetch [obj] (.addFirst deque obj))
+         (commitFetch [] (swap! current-size dec))))))
 
 (defn- object-pipe- [wire]
   (let [reader (ObjectReader. wire)

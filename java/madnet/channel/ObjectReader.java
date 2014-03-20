@@ -21,6 +21,7 @@ public class ObjectReader extends AChannel {
         }
         finally {
             isOpen = false;
+            wire.closeRead();
         }
     }
 
@@ -29,8 +30,9 @@ public class ObjectReader extends AChannel {
     }
 
     @Override
-    public void register(ISignalSet set) {
-        throw new UnsupportedOperationException();
+    public void register(ISignalSet set) throws Exception {
+        if(!isOpen)
+            throw new ClosedChannelException();
     }
 
     @Override
@@ -38,7 +40,12 @@ public class ObjectReader extends AChannel {
         if(!isOpen)
             throw new ClosedChannelException();
 
-        return wire.pop();
+        Object obj = wire.pop();
+
+        if(obj == null && !wire.writable())
+            close();
+
+        return obj;
     }
 
     @Override
@@ -53,11 +60,14 @@ public class ObjectReader extends AChannel {
             wire.commitFetch();
             read++;
 
-            o = wire.pop();
+            o = wire.fetch();
         }
 
         if(o != null)
             wire.cancelFetch(o);
+
+        if(o == null && !wire.writable())
+            close();
 
         return new Result(read);
     }
