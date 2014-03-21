@@ -38,6 +38,6 @@ public abstract class Signal extends Event implements ISignal {
         super.handle(source);
 
         if(persistent)
-            emit();
+            start();
     }
 }

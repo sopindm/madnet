@@ -26,7 +26,7 @@ public abstract class AChannel extends madnet.channel.Channel {
         Exception exception = null;
 
         try {
-            events().onClose().emit();
+            events().onClose().start();
         }
         catch(Exception e) {
             exception = e;

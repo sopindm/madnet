@@ -25,7 +25,7 @@ public class TriggerSet extends SignalSet<TriggerSet.Signal> {
         }
 
         @Override
-        public void emit() {
+        public void start() {
             if(provider() != null)
                 provider().triggered.add(this);
             else

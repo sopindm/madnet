@@ -21,7 +21,7 @@ public class AcceptChannel extends SelectableChannel<ServerSocketChannel>
     @Override
     public void register(ISignalSet set) throws Exception {
         set.conj(events.onWrite());
-        events.onWrite().emit();
+        events.onWrite().start();
     }
 
     Socket preAccepted = null;

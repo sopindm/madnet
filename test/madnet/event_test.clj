@@ -8,7 +8,7 @@
         h (e/handler ([e s] (swap! actions conj :src s :emitter e)) e)]
     (?= (seq (e/handlers e)) [h])
     (?= (seq (e/emitters h)) [e])
-    (e/emit! e 123)
+    (e/start! e 123)
     (?= @actions [:src 123 :emitter e])))
 
 (deftest event-attachment
@@ -16,7 +16,7 @@
         e (e/event)
         h (e/handler ([e s] (swap! sources conj s)) e)]
     (e/attach! e 123)
-    (e/emit! e)
+    (e/start! e)
     (?= @sources [123])))
 
 (deftest closing-handler-during-iteration
@@ -24,7 +24,7 @@
             (e/handler ([e s] (.close this)) event))]
     (let [e (e/event)
           handlers (doall (repeatedly 100 #(handler- e)))]
-      (e/emit! e 123)
+      (e/start! e 123)
       (?= (seq (e/handlers e)) nil)
       (?= (seq (e/emitters (first handlers))) nil))))
 
@@ -32,7 +32,7 @@
   (letfn [(handler- [e] (e/handler ([e s] (handler- e)) e))]
     (let [e (e/event)
           handlers (doall (repeatedly 10 #(handler- e)))]
-      (e/emit! e 123)
+      (e/start! e 123)
       (?= (count (e/handlers e)) 20))))
 
 (deftest conj!-for-events
@@ -55,7 +55,7 @@
 (deftest adding-and-removing-in-iteration-correctness
   (let [e (e/event)
         handler (e/handler ([e s] (.disj e this)) e)]
-    (e/emit! e 123)
+    (e/start! e 123)
     (?= (seq (e/emitters handler)) nil))
   (letfn [(handler- [e]
             (e/handler ([e s]
@@ -63,7 +63,7 @@
                           (.close this)) e))]
     (let [e (e/event)
           h (handler- e)]
-      (e/emit! e 123)
+      (e/start! e 123)
       (?= (seq (e/emitters (first (e/handlers e)))) [e]))))
 
 (deftest removing-handler-without-iteration
@@ -89,30 +89,30 @@
   (letfn [(handler- [e] (e/handler ([e s] (.close e)) e))]
     (let [e (e/event)
           handlers (repeatedly 100 #(handler- e))]
-      (e/emit! e 123)
+      (e/start! e 123)
       (?= (seq (e/handlers e)) nil))))
 
 (deftest cannot-emit-emitting-event
   (let [e (e/event)
-        handler (e/handler ([e s] (when (= s 123) (e/emit! e nil))) e)]
-    (?throws (e/emit! e 123) UnsupportedOperationException
-             "Cannot emit emitting event")))
+        handler (e/handler ([e s] (when (= s 123) (e/start! e nil))) e)]
+    (?throws (e/start! e 123) UnsupportedOperationException
+             "Cannot start starting event")))
 
 (deftest events-as-handlers
   (let [actions (atom [])
         e (e/event)
         h (e/event ([e s] (swap! actions conj :emit e :source s)) e)]
-    (e/emit! e 123)
+    (e/start! e 123)
     (?= (seq @actions) [:emit e :source 123])))
 
 (deftest one-shot-event
   (let [sources (atom [])
         e (e/event () :one-shot)
         h (e/handler ([e s] (swap! sources conj s)) e)]
-    (e/emit! e 123)
+    (e/start! e 123)
     (?= @sources [123])
     (?= (seq (e/handlers e)) nil)
-    (e/emit! e 123)
+    (e/start! e 123)
     (?= @sources [123])))
 
 (deftest when-any-event
@@ -124,10 +124,10 @@
         h (e/handler ([e s]
                         (swap! emitters conj e)
                         (swap! sources conj s)) e)]
-    (e/emit! e1 1)
+    (e/start! e1 1)
     (?= (seq @emitters) [e])
     (?= (seq @sources) [1])
-    (e/emit! e2 2)
+    (e/start! e2 2)
     (?= (seq @sources) [1 2])
     (?= (seq @emitters) [e e])))
 
@@ -137,7 +137,7 @@
         e (e/when-any b)
         h (e/handler ([e s] (swap! sources conj s)) e)]
     (e/attach! e 456)
-    (e/emit! b 123)
+    (e/start! b 123)
     (?= (seq @sources) [456])))
 
 (deftest when-every-test
@@ -145,9 +145,9 @@
         [e1 e2 e3] (repeatedly 3 #(e/event))
         e (e/when-every e1 e2 e3)
         h (e/handler ([_ s] (swap! sources conj s)) e)]
-    (e/emit! e1 1)
-    (e/emit! e2 2)
-    (e/emit! e3 3)
+    (e/start! e1 1)
+    (e/start! e2 2)
+    (e/start! e3 3)
     (?= (seq @sources) [3])
     (?= (seq (e/emitters h)) nil)
     (?= (seq (e/emitters e)) nil)
@@ -160,7 +160,7 @@
         e (e/when-every b)
         h (e/handler ([_ s] (swap! sources conj s)) e)]
     (e/attach! e 123)
-    (e/emit! b 42)
+    (e/start! b 42)
     (?= (seq @sources) [123])))
 
 ;;
@@ -195,85 +195,85 @@
 
 (deftest selecting-on-multiset-with-trigger
   (with-events [trigger [timer 1000] [selector _] s]
-    (e/emit! trigger)
-    (e/emit! timer)
-    (e/emit! selector)
+    (e/start! trigger)
+    (e/start! timer)
+    (e/start! selector)
     (?= (e/for-selections [e s] e) [trigger])))
 
 (deftest selecting-on-multiset-with-timer
   (with-events [trigger [timer 0] [selector _] s]
-    (e/emit! timer)
-    (e/emit! selector)
+    (e/start! timer)
+    (e/start! selector)
     (Thread/sleep 2)
     (?= (e/for-selections [e s] e) [timer]))
   (with-events [trigger [timer 3] [selector _] s]
-    (e/emit! timer)
-    (e/emit! selector)
+    (e/start! timer)
+    (e/start! selector)
     (?= (e/for-selections [e s] e) [timer]))
   (with-events [trigger [timer 5] [selector _] s]
-    (e/emit! timer)
-    (e/emit! selector)
+    (e/start! timer)
+    (e/start! selector)
     (let [f (future (e/select s))]
       (Thread/sleep 2)
-      (e/emit! trigger)
+      (e/start! trigger)
       (?= (seq @f) [trigger]))))
 
 (deftest selecting-on-multiset-with-selector
   (with-events [trigger [timer 10] [reader writer] s]
-    (e/emit! timer)
-    (e/emit! reader)
-    (e/emit! writer)
+    (e/start! timer)
+    (e/start! reader)
+    (e/start! writer)
     (?= (e/for-selections [e s] e) [writer]))
   (with-events [trigger [timer 10] [reader writer] s]
-    (e/emit! timer)
-    (e/emit! reader)
+    (e/start! timer)
+    (e/start! reader)
     (let [f (future (e/select s))]
       (Thread/sleep 3)
       (.write a-pipe-writer (java.nio.ByteBuffer/wrap (byte-array (map byte (range 10)))))
       (?= (seq @f) [reader])))
   (with-events [trigger [timer 10] [reader writer] s]
-    (e/emit! writer)
+    (e/start! writer)
     (?= (seq (e/select s)) [writer])))
 
 (deftest selecting-without-any-trigger
   (let [timer (e/timer 10)
         selector (e/selector (second (pipe-)) :write)
         s (e/event-set timer selector)]
-    (e/emit! selector)
-    (e/emit! timer)
+    (e/start! selector)
+    (e/start! timer)
     (?= (seq (e/select s)) [selector]))
   (let [selector (e/selector (second (pipe-)) :write)
         s (e/event-set selector)]
-    (e/emit! selector)
+    (e/start! selector)
     (?= (seq (e/select s)) [selector])))
 
 (deftest selecting-without-any-selector
   (let [timer (e/timer 10)
         trigger (e/trigger)
         s (e/event-set timer trigger)]
-    (e/emit! trigger)
-    (e/emit! timer)
+    (e/start! trigger)
+    (e/start! timer)
     (?= (seq (e/select s)) [trigger]))
   (let [trigger (e/trigger)
         s (e/event-set trigger)]
-    (e/emit! trigger)
+    (e/start! trigger)
     (?= (seq (e/select s)) [trigger])))
 
 (deftest selecting-event-set-now
   (with-events [trigger [timer 0] [reader writer] s]
-    (e/emit! trigger)
-    (e/emit! timer)
-    (e/emit! reader)
-    (e/emit! writer)
+    (e/start! trigger)
+    (e/start! timer)
+    (e/start! reader)
+    (e/start! writer)
     (?= (set (e/select s :timeout 0)) #{trigger timer writer})))
 
 (deftest selecting-multievent-with-timeout
   (with-events [trigger [timer 8] [reader writer] s]
-    (e/emit! timer)
-    (e/emit! reader)
+    (e/start! timer)
+    (e/start! reader)
     (?= (seq (e/select s :timeout 3)) nil)
-    (e/emit! trigger)
-    (e/emit! writer)
+    (e/start! trigger)
+    (e/start! writer)
     (?= (set (e/for-selections [e s :timeout 3] e)) #{trigger writer})
     (e/stop! writer)
     (?= (set (e/for-selections [e s :timeout 10] e)) #{timer})))
@@ -287,9 +287,9 @@
 (deftest selecting-multiset-with-only-timeouts
   (let [e (e/timer 4)
         s (e/event-set e)]
-    (e/emit! e)
+    (e/start! e)
     (?= (seq (e/for-selections [e s] e)) [e])
-    (e/emit! e)
+    (e/start! e)
     (?= (seq (e/for-selections [e s :timeout 0] e)) nil)
     (?= (seq (e/for-selections [e s :timeout 1] e)) nil)
     (?= (seq (e/for-selections [e s :timeout 10] e)) [e])))
@@ -305,7 +305,7 @@
 (deftest for-selections-into
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/event-set t1 t2)]
-    (e/emit! t1) (e/emit! t2)
+    (e/start! t1) (e/start! t2)
     (?= (e/for-selections [e s :into #{}] e) #{t1 t2})))
 
 (deftest disj-on-multiset
@@ -340,11 +340,11 @@
         e1 (e/event ([e s] (swap! a conj s)) t1)
         e2 (e/event ([e s] (swap! a conj s)) t2)
         f (future (e/loop s))]
-    (e/emit! t1)
+    (e/start! t1)
     (Thread/sleep 1)
     (?= @a [1])
     (reset! a [])
-    (e/emit! t1) (e/emit! t2)
+    (e/start! t1) (e/start! t2)
     (Thread/sleep 1)
     (?= (set @a) #{1 2})
     (future-cancel f)))

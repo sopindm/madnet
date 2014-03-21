@@ -15,13 +15,13 @@
 
 (deftest making-selector
   (with-pipe-events [sr sw reader writer s]
-    (e/emit! reader)
-    (e/emit! writer)
+    (e/start! reader)
+    (e/start! writer)
     (?= (seq (e/select s)) [writer])
     (?= (.provider reader) s))
   (with-pipe-events [reader writer re we s]
-    (e/emit! re)
-    (e/emit! we)
+    (e/start! re)
+    (e/start! we)
     (.write writer (java.nio.ByteBuffer/wrap (byte-array (map byte [1 2 3]))))
     (?= (set (e/select s)) #{re we}))
   (?throws (e/selector (.source (java.nio.channels.Pipe/open)) :write) IllegalArgumentException)
@@ -51,8 +51,8 @@
 
 (deftest canceling-selector-event
   (with-pipe-events [reader writer re we s]
-    (e/emit! re)
-    (e/emit! we)
+    (e/start! re)
+    (e/start! we)
     (.write writer (java.nio.ByteBuffer/wrap (byte-array (map byte (range 10)))))
     (e/cancel! we)
     (?= (seq (e/select s)) [re])
@@ -61,8 +61,8 @@
 
 (deftest closing-selector-set
   (with-pipe-events [reader writer re we s]
-    (e/emit! re)
-    (e/emit! we)
+    (e/start! re)
+    (e/start! we)
     (.close s)
     (?= (.provider re) nil)
     (?= (.provider we) nil)
@@ -141,7 +141,7 @@
         s (e/selector-set e)]
     (e/set-persistent! e false)
     (?false (e/persistent? e))
-    (e/emit! e)
+    (e/start! e)
     (?= (e/for-selections [e s] (.handle e) e) [e])
     (?= (seq (e/select s :timeout 0)) nil)))
 

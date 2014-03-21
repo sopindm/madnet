@@ -7,7 +7,7 @@
   (let [s (e/trigger-set)
         e (e/trigger)]
     (e/conj! s e)
-    (e/emit! e)
+    (e/start! e)
     (?= (.provider e) s)
     (?= (seq (e/signals s)) [e])
     (?= (seq (e/select s)) [e])))
@@ -15,20 +15,20 @@
 (deftest touching-trigger-twice-has-no-effect
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/emit! t)
-    (e/emit! t)
+    (e/start! t)
+    (e/start! t)
     (?= (seq (e/select s)) [t])))
 
 (deftest touching-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (dorun (map e/emit! [t1 t2]))
+    (dorun (map e/start! [t1 t2]))
     (?= (set (e/select s)) #{t1 t2})))
 
 (deftest touching-set-with-several-triggers
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/emit! t1)
+    (e/start! t1)
     (?= (seq (e/select s)) [t1])))
 
 (deftest select!-is-blocking-for-triggers
@@ -37,7 +37,7 @@
         f (future (e/select s))]
     (Thread/sleep 10)
     (?false (realized? f))
-    (e/emit! t)
+    (e/start! t)
     (let [a (agent f)]
       (send-off a #(deref %))
       (when (not (await-for 1000 a)) (throw (RuntimeException. "Agent timeout")))
@@ -46,8 +46,8 @@
 (deftest do-selections-test
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
-    (e/emit! t1)
-    (e/emit! t2)
+    (e/start! t1)
+    (e/start! t2)
     (let [a (atom [])]
       (e/do-selections [e s]
         (swap! a conj e))
@@ -57,10 +57,10 @@
 (deftest for-selections-test
   (let [triggers (repeatedly 100 e/trigger)
         s (apply e/trigger-set triggers)]
-    (doall (map e/emit! triggers))
+    (doall (map e/start! triggers))
     (?= (set (e/for-selections [e s] e)) (set triggers))
     (?= (e/for-selections [e s :timeout 0] e) [])
-    (doall (map e/emit! (take 3 triggers)))
+    (doall (map e/start! (take 3 triggers)))
     (?= (e/for-selections [e s] 1) (repeat 3 1))))
 
 (deftest registering-trigger-in-multiple-sets-error
@@ -73,7 +73,7 @@
     (?= (seq (e/select s :timeout 0)) nil)
     (let [t (e/trigger)]
       (e/conj! s t)
-      (e/emit! t)
+      (e/start! t)
       (?= (seq (e/select s :timeout 0)) [t]))))
 
 (deftest selecting-trigger-with-timeout
@@ -99,7 +99,7 @@
 (deftest closing-trigger-provider
   (let [t (e/trigger)
         s (e/trigger-set t)]
-    (e/emit! t)
+    (e/start! t)
     (.close s)
     (?= (.provider t) nil)
     (?= (seq (e/signals s)) nil)
@@ -113,7 +113,7 @@
   (let [t (e/trigger 123)
         s (e/trigger-set t)]
     (?= (.provider t) s)
-    (e/emit! t)
+    (e/start! t)
     (.close t)
     (?= (.provider t) nil)
     (e/select s :timeout 0)
@@ -164,6 +164,6 @@
         s (e/trigger-set e)]
     (e/set-persistent! e true)
     (?true (e/persistent? e))
-    (e/emit! e)
+    (e/start! e)
     (?= (e/for-selections [e s] (.handle e) e) [e])
     (?= (seq (e/select s :timeout 0)) [e])))

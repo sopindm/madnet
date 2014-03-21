@@ -47,7 +47,7 @@ public class TimerSet extends SignalSet<TimerSet.Signal> {
         }
 
         @Override
-        public void emit() {
+        public void start() {
             finishStamp = System.currentTimeMillis() + timeout;
 
             LinkedList<Signal> entry = provider().timeouts.get(finishStamp);

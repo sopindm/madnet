@@ -22,7 +22,7 @@ public class Event  extends EventHandler implements IEvent {
     boolean inIteration = false;
 
     @Override
-    public void emit() throws Exception {
+    public void start() throws Exception {
         handle();
     }
 
@@ -32,7 +32,7 @@ public class Event  extends EventHandler implements IEvent {
 
     public void handle(Object source) throws Exception {
         if(inIteration)
-            throw new UnsupportedOperationException("Cannot emit emitting event");
+            throw new UnsupportedOperationException("Cannot start starting event");
 
         try {
             inIteration = true;

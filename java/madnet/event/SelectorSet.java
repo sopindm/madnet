@@ -115,7 +115,7 @@ public class SelectorSet implements ISignalSet {
         }
 
         @Override
-        public void emit() {
+        public void start() {
             key.interestOps(op);
         }
 

@@ -30,7 +30,7 @@ public class WritableChannel<T extends java.nio.channels.SelectableChannel &
     @Override 
     public void register(madnet.event.ISignalSet set) throws Exception {
         set.conj(events.onWrite());
-        events.onWrite().emit();
+        events.onWrite().start();
     }
 
     @Override

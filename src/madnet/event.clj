@@ -64,9 +64,9 @@
 (defn handlers [event]
   (.handlers event))
 
-(defn emit!
-  ([event] (.emit event) event)
-  ([event obj] (attach! event obj) (emit! event)))
+(defn start!
+  ([event] (.start event) event)
+  ([event obj] (attach! event obj) (start! event)))
 
 (defn stop! [signal] (.stop signal))
 

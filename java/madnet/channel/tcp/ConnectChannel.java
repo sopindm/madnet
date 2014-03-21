@@ -33,7 +33,7 @@ public class ConnectChannel extends SelectableChannel<SocketChannel>
     @Override
     public void register(ISignalSet set) throws Exception {
         set.conj(events.onWrite());
-        events.onWrite().emit();
+        events.onWrite().start();
     }
     
     private boolean tryConnect() throws java.io.IOException {

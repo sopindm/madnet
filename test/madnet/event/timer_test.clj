@@ -9,13 +9,13 @@
     (e/conj! s t)
     (?= (seq (e/signals s)) [t])
     (?= (.provider t) s)
-    (e/emit! t)
+    (e/start! t)
     (?= (seq (e/select s)) [t])))
 
 (deftest making-timer-with-timeout
   (let [t (e/timer 3)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (?= (seq (e/select s :timeout 0)) nil)
     (Thread/sleep 4)
     (?= (seq (e/select s :timeout 0)) [t])))
@@ -23,7 +23,7 @@
 (deftest timer-blocking-select
   (let [t (e/timer 2)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (?= (seq (e/select s)) [t])))
     
 (deftest select-with-no-active-timers-doesnt-block
@@ -36,28 +36,28 @@
 (deftest two-events-with-same-timestamp
   (let [[t1 t2] (repeatedly 2 #(e/timer 1))
         s (e/timer-set t1 t2)]
-    (doall (map e/emit! [t1 t2]))
+    (doall (map e/start! [t1 t2]))
     (?= (set (e/select s)) #{t1 t2})))
 
 (deftest starting-no-registered-timer
-  (?throws (e/emit! (e/timer 1)) NullPointerException))
+  (?throws (e/start! (e/timer 1)) NullPointerException))
 
 (deftest stopping-timer
   (let [t (e/timer 1)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (e/stop! t)
     (?= (seq (e/select s)) nil))
   (let [[t1 t2] (repeatedly 2 #(e/timer 1))
         s (e/timer-set t1 t2)]
-    (doall (map e/emit! [t1 t2]))
+    (doall (map e/start! [t1 t2]))
     (e/stop! t1)
     (?= (seq (e/select s)) [t2])))
 
 (deftest selecting-timer-with-timeout
   (let [t (e/timer 5)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (?= (seq (e/select s :timeout 3)) nil)
     (?= (seq (e/select s :timeout 3)) [t])))
 
@@ -72,13 +72,13 @@
   (let [t (e/timer 4)
         t2 (e/timer 5)
         s (e/timer-set t t2)]
-    (e/emit! t)
-    (e/emit! t2)
+    (e/start! t)
+    (e/start! t2)
     (e/cancel! t)
     (?= (seq (e/select s)) [t2]))
   (let [t (e/timer 5)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (let [f (future (e/select s :timeout 5))]
       (Thread/sleep 2)
       (e/cancel! t)
@@ -94,7 +94,7 @@
 (deftest closing-timer-provider
   (let [t (e/timer 123)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (.close s)
     (?= (.provider t) nil)
     (?= (seq (e/signals s)) nil)
@@ -107,7 +107,7 @@
 (deftest closing-timer
   (let [t (e/timer 123)
         s (e/timer-set t)]
-    (e/emit! t)
+    (e/start! t)
     (.close t)
     (?= (e/attachment t) nil)
     (?= (.provider t) nil)
