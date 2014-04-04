@@ -40,9 +40,9 @@ trait IEvent extends Closeable with ISet[IEventHandler] {
   private[this] val _handlers = new Set[IEventHandler]
   def handlers = _handlers.snapshot
 
-  var oneShot = false
   def emit(source: Any) = handle(source)
 
+  var oneShot = false
   def handle(source: Any) {
     handlers.foreach(_.call(this, source))
     if(oneShot) close()

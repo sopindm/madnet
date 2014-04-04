@@ -55,11 +55,11 @@
      `(handler- Event #'setup-event-
                 ([~emitter ~source] ~@handler) ~@events)))
 
-(defn emitters [handler]
-  (scala.collection.JavaConversions/asJavaSet (.emitters handler)))
+(defn- scala-set [set] (scala.collection.JavaConversions/asJavaSet set))
+(defn- scala-mset [set] (scala.collection.JavaConversions/mutableSetAsJavaSet set))
 
-(defn handlers [event]
-  (scala.collection.JavaConversions/asJavaSet (.handlers event)))
+(defn emitters [handler] (scala-set (.emitters handler)))
+(defn handlers [event] (scala-set (.handlers event)))
 
 (defn emit! [event obj] (.emit event obj))
 
@@ -76,28 +76,18 @@
         (.oneShot_$eq true)))
   ([& events] (apply conj-into- (when-every) events)))
 
-(comment
-(defn attach! [event obj] (.attach event obj) event)
-(defn attachment [event] (.attachment event))
-
 ;;
 ;; Signals
 ;;
 
-(defn signals [set]
-  (.signals set))
+(defn attach! [signal obj] (.attach signal obj) signal)
+(defn attachment [signal] (.attachment signal))
 
 (defn start! [signal] (.start signal))
 (defn stop! [signal] (.stop signal))
 
-(defn cancel! [x]
-  (.cancel x))
-
-(defn persistent? [signal]
-  (.persistent signal))
-
-(defn set-persistent! [signal persistent?]
-  (.persistent signal persistent?))
+(defn signals [set] (scala-set (.signals set)))
+(defn selections [set] (scala-mset (.selections set)))
 
 (defn select [set & {:as options}]
   (let [timeout (:timeout options)
@@ -105,7 +95,28 @@
     (cond now? (.selectNow set)
           timeout (.selectIn set timeout)
           :else (.select set))
-    (.selections set)))
+    (selections set)))
+
+(defmacro do-selections [[var selector & options] & body]
+  `(let [selections# (select ~selector ~@options)
+         iterator# (.iterator selections#)]
+     (while (.hasNext iterator#)
+       (let [~var (.next iterator#)]
+         ~@body)
+       (.remove iterator#))))
+
+(defmacro for-selections [[var selector & options] & body]
+  `(let [selections# (select ~selector ~@options)
+         iterator# (.iterator selections#)
+         coll# (transient ~(or (:into (apply hash-map options)) []))]
+     (clojure.core/loop [coll# coll# iterator# iterator#]
+       (if-not (.hasNext iterator#)
+         (persistent! coll#)
+         (let [~var (.next iterator#)
+               value# (do ~@body)
+               conj# (clojure.core/conj! coll# value#)]
+           (.remove iterator#)
+           (recur conj# iterator#))))))
 
 (defmacro defsignal [[name [& args] & body] [set-name & set-body]]
   `(do (defn ~name
@@ -117,6 +128,18 @@
 
 (defsignal (trigger [] (madnet.event.TriggerSignal.))
   (trigger-set (madnet.event.TriggerSet.)))
+
+(comment
+
+
+(defn cancel! [x]
+  (.cancel x))
+
+(defn persistent? [signal]
+  (.persistent signal))
+
+(defn set-persistent! [signal persistent?]
+  (.persistent signal persistent?))
 
 (defsignal (timer [milliseconds] (madnet.event.TimerSignal. milliseconds))
   (timer-set (madnet.event.TimerSet.)))
@@ -142,27 +165,7 @@
   ([] (madnet.event.MultiSignalSet.))
   ([& events] (reduce conj! (event-set) events)))
 
-(defmacro do-selections [[var selector & options] & body]
-  `(let [selections# (select ~selector ~@options)
-         iterator# (.iterator selections#)]
-     (while (.hasNext iterator#)
-       (let [~var (.next iterator#)]
-         ~@body)
-       (.remove iterator#))
-     nil))
 
-(defmacro for-selections [[var selector & options] & body]
-  `(let [selections# (select ~selector ~@options)
-         iterator# (.iterator selections#)
-         coll# (transient ~(or (:into (apply hash-map options)) []))]
-     (clojure.core/loop [coll# coll# iterator# iterator#]
-       (if-not (.hasNext iterator#)
-         (persistent! coll#)
-         (let [~var (.next iterator#)
-               value# (do ~@body)
-               conj# (clojure.core/conj! coll# value#)]
-           (.remove iterator#)
-           (recur conj# iterator#))))))
 
 (defn loop [event-set]
   (do-selections [e event-set] (.handle e))
