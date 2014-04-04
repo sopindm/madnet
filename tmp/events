@@ -1,13 +1,32 @@
-(handler ([emitter source] ...) e1 e2 e3)
+handler {
+  +source
+  -source
 
-(event (call [emitter source] (println "Called"))
-       (emit [source] (println "Emitted"))
-       :emitters [e1 e2 e3]
-       :handlers [h1 h2 h3])
+  call(who, what)
+}
 
-(handler #(println "Hello, world"))
+source: handler {
+  +handler
+  -handler
+  
+  emit(what)  
+}
 
-(event :call #(println "Called")
-       :emit #(println "Emitted")
-       :emitters e1 e2 e3
-       :handlers h1 h2 h2)
+signal: source {
+   register+
+   register-
+
+   active?
+   activate
+   deactivate
+
+   attach
+   attachment
+}
+
+signalSet {
+   signal+
+   signal-
+
+   select                    
+}

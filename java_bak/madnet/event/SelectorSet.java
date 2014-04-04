@@ -138,6 +138,16 @@ public class SelectorSet implements ISignalSet {
             if(!persistent())
                 stop();
         }
+
+        Object attachment;
+
+        @Override
+        public Object attachment() { return attachment; }
+        
+        @Override
+        public void attach(Object attachment) {
+            this.attachment = attachment;
+        }
     }
 
     @Override

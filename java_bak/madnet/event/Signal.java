@@ -16,6 +16,7 @@ public abstract class Signal extends Event implements ISignal {
     @Override
     public void close() throws java.io.IOException {
         cancel();
+        attachment = null;
         super.close();
     }
 
@@ -40,4 +41,11 @@ public abstract class Signal extends Event implements ISignal {
         if(persistent)
             start();
     }
+
+    Object attachment = null;
+
+    @Override
+    public Object attachment() { return attachment; }
+    @Override
+    public void attach(Object attachment) { this.attachment = attachment; }
 }

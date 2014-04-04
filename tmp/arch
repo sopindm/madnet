@@ -1,0 +1,25 @@
+low level:
+  handlers, events, signals
+  tcp channels, udp channels, pipes, object pipes
+
+channel:
+  close
+  open?
+  
+  register(event set)
+  cancel-registration
+
+  onRead, onWrite, onClose events
+
+a-channel: 
+  close
+  onClose event
+    
+writable channel (tcp, udp, pipe)
+  onWrite event
+
+high level:
+  ranges, buffers, sequencies
+  high level tcp, udp, pipe channels
+  fake tcp/udp channels
+  channel combinators and so on...

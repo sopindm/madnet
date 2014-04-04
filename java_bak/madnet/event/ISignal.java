@@ -9,5 +9,9 @@ public interface ISignal extends IEvent {
     boolean persistent();
     void persistent(boolean value);
 
+    void start();
     void stop();
+
+    Object attachment();
+    void attach(Object attachment);
 }

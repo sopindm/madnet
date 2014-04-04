@@ -10,8 +10,6 @@ public class Event  extends EventHandler implements IEvent {
         Iterator<IEventHandler> it = handlers.iterator();
         while(it.hasNext()) disj(it.next());
 
-        attachment = null;
-
         super.close();
     }
 
@@ -22,12 +20,8 @@ public class Event  extends EventHandler implements IEvent {
     boolean inIteration = false;
 
     @Override
-    public void start() throws Exception {
-        handle();
-    }
-
-    public void handle() throws Exception {
-        handle(attachment);
+    public void emit(Object obj) throws Exception {
+        handle(obj);
     }
 
     public void handle(Object source) throws Exception {
@@ -92,11 +86,4 @@ public class Event  extends EventHandler implements IEvent {
 
         handler.unsubscribe(this);
     }
-
-    Object attachment = null;
-
-    @Override
-    public Object attachment() { return attachment; }
-    @Override
-    public void attach(Object attachment) { this.attachment = attachment; }
 }

@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [conj! disj! loop])
   (:require [clojure.set :as s])
   (:import [java.nio.channels SelectionKey]
-           [madnet.event EventHandler Event]))
+           [madnet.event Event EventHandler]))
 
 ;;
 ;; ISet
@@ -10,7 +10,7 @@
 
 (defn- conj-into-
   ([value] value)
-  ([value set] (.conj set value) value)
+  ([value set] (.$plus$eq set value) value)
   ([value set & more-sets]
      (reduce conj-into- (conj-into- value set) more-sets)))
 
@@ -55,20 +55,17 @@
      `(handler- Event #'setup-event-
                 ([~emitter ~source] ~@handler) ~@events)))
 
-(defn attach! [event obj] (.attach event obj) event)
-(defn attachment [event] (.attachment event))
-
 (defn emitters [handler]
-  (.emitters handler))
+  (scala.collection.JavaConversions/asJavaSet (.emitters handler)))
 
 (defn handlers [event]
-  (.handlers event))
+  (scala.collection.JavaConversions/asJavaSet (.handlers event)))
 
-(defn start!
-  ([event] (.start event) event)
-  ([event obj] (attach! event obj) (start! event)))
+(defn emit! [event obj] (.emit event obj))
 
-(defn stop! [signal] (.stop signal))
+(comment
+(defn attach! [event obj] (.attach event obj) event)
+(defn attachment [event] (.attachment event))
 
 (defn when-any
   ([] (proxy [Event] []
@@ -90,6 +87,9 @@
 
 (defn signals [set]
   (.signals set))
+
+(defn start! [signal] (.start signal))
+(defn stop! [signal] (.stop signal))
 
 (defn cancel! [x]
   (.cancel x))
@@ -167,4 +167,4 @@
 
 (defn loop [event-set]
   (do-selections [e event-set] (.handle e))
-  (recur event-set))
+  (recur event-set)))
