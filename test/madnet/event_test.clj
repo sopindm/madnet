@@ -11,22 +11,14 @@
     (e/emit! e 123)
     (?= @actions [:src 123 :emitter e])))
 
-(comment
-(deftest closing-handler-during-iteration
+(deftest closing-handler
   (letfn [(handler- [event]
             (e/handler ([e s] (.close this)) event))]
     (let [e (e/event)
-          handlers (doall (repeatedly 100 #(handler- e)))]
-      (e/start! e 123)
+          h (e/handler () e)]
+      (.close h)
       (?= (seq (e/handlers e)) nil)
-      (?= (seq (e/emitters (first handlers))) nil))))
-
-(deftest adding-handlers-during-iteration
-  (letfn [(handler- [e] (e/handler ([e s] (handler- e)) e))]
-    (let [e (e/event)
-          handlers (doall (repeatedly 10 #(handler- e)))]
-      (e/start! e 123)
-      (?= (count (e/handlers e)) 20))))
+      (?= (seq (e/emitters h)) nil))))
 
 (deftest conj!-for-events
   (let [actions (atom [])
@@ -45,24 +37,10 @@
     (?= (seq (e/emitters h1)) nil)
     (?= (seq (e/emitters h2)) nil)))
 
-(deftest adding-and-removing-in-iteration-correctness
-  (let [e (e/event)
-        handler (e/handler ([e s] (.disj e this)) e)]
-    (e/start! e 123)
-    (?= (seq (e/emitters handler)) nil))
-  (letfn [(handler- [e]
-            (e/handler ([e s]
-                          (.conj e (handler- e))
-                          (.close this)) e))]
-    (let [e (e/event)
-          h (handler- e)]
-      (e/start! e 123)
-      (?= (seq (e/emitters (first (e/handlers e)))) [e]))))
-
 (deftest removing-handler-without-iteration
   (let [e (e/event)
         handler (e/handler ([e s]) e)]
-    (.disj e handler)
+    (.$minus$eq e handler)
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/emitters handler)) nil)))
 
@@ -70,42 +48,27 @@
   (let [s (e/event)
         e (e/event () s)
         h (e/handler ([e s]) e)]
-    (e/attach! e 123)
     (.close e)
-    (?= (e/attachment e) nil)
     (?= (seq (e/handlers s)) nil)
     (?= (seq (e/emitters e)) nil)
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/emitters h)) nil)))
 
-(deftest closing-event-by-handler
-  (letfn [(handler- [e] (e/handler ([e s] (.close e)) e))]
-    (let [e (e/event)
-          handlers (repeatedly 100 #(handler- e))]
-      (e/start! e 123)
-      (?= (seq (e/handlers e)) nil))))
-
-(deftest cannot-emit-emitting-event
-  (let [e (e/event)
-        handler (e/handler ([e s] (when (= s 123) (e/start! e nil))) e)]
-    (?throws (e/start! e 123) UnsupportedOperationException
-             "Cannot start starting event")))
-
 (deftest events-as-handlers
   (let [actions (atom [])
         e (e/event)
         h (e/event ([e s] (swap! actions conj :emit e :source s)) e)]
-    (e/start! e 123)
+    (e/emit! e 123)
     (?= (seq @actions) [:emit e :source 123])))
 
 (deftest one-shot-event
   (let [sources (atom [])
         e (e/event () :one-shot)
         h (e/handler ([e s] (swap! sources conj s)) e)]
-    (e/start! e 123)
+    (e/emit! e 123)
     (?= @sources [123])
     (?= (seq (e/handlers e)) nil)
-    (e/start! e 123)
+    (e/emit! e 123)
     (?= @sources [123])))
 
 (deftest when-any-event
@@ -117,44 +80,31 @@
         h (e/handler ([e s]
                         (swap! emitters conj e)
                         (swap! sources conj s)) e)]
-    (e/start! e1 1)
+    (e/emit! e1 1)
     (?= (seq @emitters) [e])
     (?= (seq @sources) [1])
-    (e/start! e2 2)
+    (e/emit! e2 2)
     (?= (seq @sources) [1 2])
     (?= (seq @emitters) [e e])))
-
-(deftest when-any-event-with-attachment
-  (let [sources (atom [])
-        b (e/event)
-        e (e/when-any b)
-        h (e/handler ([e s] (swap! sources conj s)) e)]
-    (e/attach! e 456)
-    (e/start! b 123)
-    (?= (seq @sources) [456])))
 
 (deftest when-every-test
   (let [sources (atom [])
         [e1 e2 e3] (repeatedly 3 #(e/event))
         e (e/when-every e1 e2 e3)
         h (e/handler ([_ s] (swap! sources conj s)) e)]
-    (e/start! e1 1)
-    (e/start! e2 2)
-    (e/start! e3 3)
+    (e/emit! e1 1)
+    (e/emit! e2 2)
+    (e/emit! e3 3)
     (?= (seq @sources) [3])
     (?= (seq (e/emitters h)) nil)
     (?= (seq (e/emitters e)) nil)
     (?= (seq (e/handlers e)) nil)
     (?= (seq (e/handlers e1)) nil)
     (?= (seq (e/handlers e2)) nil)
-    (?= (seq (e/handlers e3)) nil))
-  (let [sources (atom [])
-        b (e/event)
-        e (e/when-every b)
-        h (e/handler ([_ s] (swap! sources conj s)) e)]
-    (e/attach! e 123)
-    (e/start! b 42)
-    (?= (seq @sources) [123])))
+    (?= (seq (e/handlers e3)) nil)))
+
+(comment
+;signals attachment (check attach and removing on close)
 
 ;;
 ;; Events multiset

@@ -10,25 +10,48 @@ class Set[T] extends scala.collection.mutable.Set[T] {
   override def iterator = _set.iterator
 }
 
-class EventHandler {
-  private[this] val _emitters = new Set[Event]
+trait Closeable extends java.io.Closeable {
+  override def close {}
+}
+
+trait IEventHandler extends Closeable {
+  private[this] val _emitters = new Set[IEvent]
   def emitters = _emitters.snapshot
 
-  def call(emitter: Event, source: Any) {}
+  def call(emitter: IEvent, source: Any) {}
 
-  private[event] def link(e: Event) { _emitters += e }
+  override def close { _emitters.foreach(_ -= this); super.close() }
+
+  private[event] def link(e: IEvent) { _emitters += e }
+  private[event] def unlink(e: IEvent) { _emitters -= e }
 }
+
+class EventHandler extends IEventHandler
 
 trait ISet[T] {
   def +=(e: T): ISet[T]
   def +=(e1: T, e2: T, es: T*): ISet[T] = { this += e1; this += e2; (this /: es)(_ += _) }
+
+  def -=(e: T): ISet[T]
+  def -=(e1: T, e2: T, es: T*): ISet[T] = { this -= e1; this -= e2; (this /: es)(_ -= _) }
 }
 
-class Event extends ISet[EventHandler] {
-  private[this] val _handlers = new Set[EventHandler]
+trait IEvent extends Closeable with ISet[IEventHandler] {
+  private[this] val _handlers = new Set[IEventHandler]
   def handlers = _handlers.snapshot
 
-  def emit(source: Any) { handlers.foreach(_.call(this, source)) }
+  var oneShot = false
+  def emit(source: Any) = handle(source)
 
-  override def +=(h: EventHandler) = { h.link(this); _handlers += h; this }
+  def handle(source: Any) {
+    handlers.foreach(_.call(this, source))
+    if(oneShot) close()
+  }
+
+  override def close { _handlers.foreach(this -= _); super.close() }
+
+  override def +=(h: IEventHandler) = { h.link(this); _handlers += h; this }
+  override def -=(h: IEventHandler) = { h.unlink(this); _handlers -= h; this }
 }
+
+class Event extends IEvent with IEventHandler

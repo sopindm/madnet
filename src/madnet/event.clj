@@ -16,13 +16,13 @@
 
 (defn conj!
   ([set] set)
-  ([set value] (.conj set value) set)
+  ([set value] (.$plus$eq set value) set)
   ([set value & more-values] 
      (reduce conj! (conj! set value) more-values)))
 
 (defn disj!
   ([set] set)
-  ([set value] (.disj set value) set)
+  ([set value] (.$minus$eq set value) set)
   ([set value & more-values]
      (reduce disj! (disj! set value) more-values)))
 
@@ -46,7 +46,7 @@
   ([event & args]
      (let [events (remove keyword? args)
            options (filter keyword? args)]
-       (when (some #{:one-shot} options) (.oneShot event true))
+       (when (some #{:one-shot} options) (.oneShot_$eq event true))
        (apply conj-into- event events))))
 
 (defmacro event
@@ -63,13 +63,8 @@
 
 (defn emit! [event obj] (.emit event obj))
 
-(comment
-(defn attach! [event obj] (.attach event obj) event)
-(defn attachment [event] (.attachment event))
-
 (defn when-any
-  ([] (proxy [Event] []
-        (call [e s] (.handle this (or (.attachment this) s)))))
+  ([] (proxy [Event] [] (call [e s] (.handle this s))))
   ([& events] (apply conj-into- (when-any) events)))
          
 (defn when-every
@@ -77,9 +72,13 @@
               (call [e s]
                 (disj! e this)
                 (when (-> this .emitters .isEmpty)
-                  (.handle this (or (.attachment this) s)))))
-        (.oneShot true)))
+                  (.handle this s))))
+        (.oneShot_$eq true)))
   ([& events] (apply conj-into- (when-every) events)))
+
+(comment
+(defn attach! [event obj] (.attach event obj) event)
+(defn attachment [event] (.attachment event))
 
 ;;
 ;; Signals
