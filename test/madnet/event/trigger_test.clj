@@ -85,7 +85,6 @@
     (Thread/sleep 6)
     (?true (realized? f))))
 
-(comment
 (deftest canceling-trigger
   (let [[t1 t2] (repeatedly 2 e/trigger)
         s (e/trigger-set t1 t2)]
@@ -105,7 +104,7 @@
     (.close s)
     (?= (.provider t) nil)
     (?= (seq (e/signals s)) nil)
-    (?= (seq (.selections s)) nil)
+    (?= (seq (e/selections s)) nil)
     (?throws (e/select s) ClosedSelectorException)
     (?throws (e/select s :timeout 0) ClosedSelectorException)
     (?throws (e/select s :timeout 10) ClosedSelectorException)
@@ -122,13 +121,6 @@
     (?= (e/attachment t) nil)
     (?= (seq (e/signals s)) nil)))
 
-(deftest errors-adding-trigger
-  (let [t (e/trigger)
-        s (e/trigger-set)]
-    (?throws (e/conj! s (proxy [madnet.event.Signal] [])) IllegalArgumentException)
-    (?throws (e/conj! (proxy [madnet.event.SignalSet] [] (conj [event] (.register event this))) t)
-             IllegalArgumentException)))
-
 (deftest trigger-set-without-events-doesnt-block
   (let [s (e/trigger-set)]
     (?= (seq (e/select s)) nil)
@@ -139,18 +131,15 @@
         actions (atom [])
         h (e/handler ([e s] (swap! actions conj {:emit e :src s})) t)]
     (e/attach! t 123)
-    (.handle t)
+    (e/emit! t 123)
     (?= (seq @actions) [{:emit t :src 123}])
     (.handle t 456)
     (?= (seq @actions) [{:emit t :src 123} {:emit t :src 456}])))
 
-(deftest closing-trigger-closes-events-and-handles
-  (let [e (e/event)
-        t (e/trigger)
+(deftest closing-trigger-closes-handles
+  (let [t (e/trigger)
         h (e/handler () t)]
-    (e/conj! e t)
     (.close t)
-    (?= (seq (e/handlers e)) nil)
     (?= (seq (e/emitters h)) nil)))
 
 (deftest disj-for-trigger-sets
@@ -167,5 +156,5 @@
     (e/set-persistent! e true)
     (?true (e/persistent? e))
     (e/start! e)
-    (?= (e/for-selections [e s] (.handle e) e) [e])
-    (?= (seq (e/select s :timeout 0)) [e]))))
+    (?= (e/for-selections [e s] (e/emit! e (e/attachment e)) e) [e])
+    (?= (seq (e/select s :timeout 0)) [e])))

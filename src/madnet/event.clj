@@ -97,6 +97,14 @@
           :else (.select set))
     (selections set)))
 
+(defn cancel! [x] (if-let [provider (.provider x)] (disj! provider x)))
+
+(defn persistent? [signal]
+  (.persistent signal))
+
+(defn set-persistent! [signal persistent?]
+  (.persistent_$eq signal persistent?))
+
 (defmacro do-selections [[var selector & options] & body]
   `(let [selections# (select ~selector ~@options)
          iterator# (.iterator selections#)]
@@ -130,17 +138,6 @@
   (trigger-set (madnet.event.TriggerSet.)))
 
 (comment
-
-
-(defn cancel! [x]
-  (.cancel x))
-
-(defn persistent? [signal]
-  (.persistent signal))
-
-(defn set-persistent! [signal persistent?]
-  (.persistent signal persistent?))
-
 (defsignal (timer [milliseconds] (madnet.event.TimerSignal. milliseconds))
   (timer-set (madnet.event.TimerSet.)))
 
@@ -164,8 +161,6 @@
 (defn event-set
   ([] (madnet.event.MultiSignalSet.))
   ([& events] (reduce conj! (event-set) events)))
-
-
 
 (defn loop [event-set]
   (do-selections [e event-set] (.handle e))
