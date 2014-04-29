@@ -10,6 +10,9 @@ class Channel extends evil_ant.Closeable {
   def writeable: Boolean = true
   def closeWrite(): Unit = { throw new UnsupportedOperationException }
 
+  def write(ch: Channel): Unit = { throw new UnsupportedOperationException }
+  def read(ch: Channel): Unit = { throw new UnsupportedOperationException }
+
   def tryPush(obj: AnyRef): Boolean = { throw new UnsupportedOperationException }
   def push(obj: AnyRef): Unit = tryPush(obj)
   def pushIn(obj: AnyRef, milliseconds: Long): Boolean = tryPush(obj)

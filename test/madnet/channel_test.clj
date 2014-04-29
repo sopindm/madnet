@@ -12,7 +12,11 @@
     (?throws (c/close-read c) UnsupportedOperationException)
     (?throws (c/close-write c) UnsupportedOperationException)))
 
-;channels are readable and writeable
+(deftest channels-are-readable-and-writeable
+  (let [c (Channel.)]
+    (?throws (c/read! c nil) UnsupportedOperationException)
+    (?throws (c/write! c nil) UnsupportedOperationException)))
+
 ;channels have some events (nulls by default)
 
 (deftest channels-have-queue-interface
@@ -26,4 +30,6 @@
     
 ;channel have default implementation for push/pushIn/pop/popIn
 ;channel default implementation for push/pushIn/pop/popIn tries to use events
+
+;channel read/write returns result structure (with read/writen info)
 
