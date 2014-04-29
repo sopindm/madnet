@@ -1,54 +1,31 @@
 (ns madnet.channel
-  (:refer-clojure :exclude [read pop!])
-  (:require [madnet.channel.pipe])
-  (:import [madnet.channel IChannel]
-           [madnet.event ISignalSet]))
-
-(defn open? [^IChannel ch]
-  (.isOpen ch))
-
-(defn register [^IChannel ch ^ISignalSet set]
-  (.register ch set))
-
-(defn events [^IChannel ch]
-  (.events ch))
+  (:refer-clojure :exclude [pop!]))
 
 ;;
-;; Reading/writing
+;; Closeable
 ;;
 
-(defn write! [^IChannel dest ^IChannel src]
-  (or (.write dest src) (.read src dest) (throw (UnsupportedOperationException.))))
+(defn open? [channel] (.isOpen channel))
+(defn close [channel] (.close channel))
 
-(defn read! [^IChannel dest ^IChannel src]
-  (or (.read dest src) (.write src dest) (throw (UnsupportedOperationException.))))
+(defn readable? [channel] (.readable channel))
+(defn close-read [channel] (.closeRead channel))
 
-(defn write [^IChannel dest ^IChannel src]
-  (let [writen (.clone dest)
-        read (.clone src)]
-    (write! writen read)
-    [writen read]))
-
-(defn read [^IChannel dest ^IChannel src]
-  (let [read (.clone dest)
-        writen (.clone src)]
-    (read! read writen)
-    [read writen]))
-
-(defn push! [ch obj & {timeout :timeout}]
-  (letfn [(try-push- [] (if (.tryPush ch obj) ch))
-          (push- [] (do (.push ch obj) ch))
-          (push-with-timeout- [] (if (.push ch obj timeout) ch))]
-    (if timeout (if (zero? timeout) (try-push-) (push-with-timeout-))
-      (push-))))
-
-(defn pop! [ch & {timeout :timeout}]
-  (if timeout (if (zero? timeout) (.tryPop ch) (.pop ch timeout))
-      (.pop ch)))
+(defn writeable? [channel] (.writeable channel))
+(defn close-write [channel] (.closeWrite channel))
 
 ;;
-;; Wrappers
+;; Queue Interface
 ;;
 
-(def pipe madnet.channel.pipe/pipe)
-(def object-pipe madnet.channel.pipe/object-pipe)
+(defn tryPush! [channel obj] (.tryPush channel obj))
+(defn push! [channel obj] (.push channel obj))
+(defn push-in! [channel obj milliseconds] (.pushIn channel obj milliseconds))
+
+(defn tryPop! [channel] (.tryPop channel))
+(defn pop! [channel] (.pop channel))
+(defn pop-in! [channel milliseconds] (.popIn channel milliseconds))
+
+
+
+
