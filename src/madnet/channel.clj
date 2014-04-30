@@ -7,12 +7,10 @@
 
 (defn open? [channel] (.isOpen channel))
 (defn close [channel] (.close channel))
+(defn on-close [channel] (.onClose channel))
 
-(defn readable? [channel] (.readable channel))
-(defn close-read [channel] (.closeRead channel))
-
-(defn writeable? [channel] (.writeable channel))
-(defn close-write [channel] (.closeWrite channel))
+(defn active? [channel] (.isActive channel))
+(defn on-active [channel] (.onActive channel))
 
 ;;
 ;; Reading/writing
@@ -28,7 +26,3 @@
 (defn tryPop! [channel] (.tryPop channel))
 (defn pop! [channel] (.pop channel))
 (defn pop-in! [channel milliseconds] (.popIn channel milliseconds))
-
-
-
-
