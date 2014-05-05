@@ -22,12 +22,12 @@
 ;; Closing
 ;;
 
-(defn- channel-with-events []
-  (let [[on-active on-close] (repeatedly 2 #(e/event))]
-    (proxy [Channel] []
-      (closeImpl [] nil)
-      (onActive [] on-active)
-      (onClose [] on-close))))
+(defn- channel-with-events [& {:keys [on-active on-close] :or {on-active (e/event)
+                                                               on-close (e/event)}}]
+  (proxy [Channel] []
+    (closeImpl [] nil)
+    (onActive [] on-active)
+    (onClose [] on-close)))
 
 (deftest channels-close-should-close-events
   (let [c (channel-with-events)] 
@@ -49,6 +49,28 @@
     (?emits (.close c) event [event c])))
 
 ;;
+;; Registration
+;;
+
+(deftest channels-can-register-themselves-in-signal-sets
+  (let [c (Channel.)]
+    (with-open [s (e/signal-set)]
+      (c/register c s)
+      (?= (count (e/absorbers s)) 0))))
+
+(deftest channel-default-implementation-register-no-null-signals
+  (with-open [s (e/signal-set)]
+    (let [c (channel-with-events :on-active (e/switch) :on-close (e/switch))]
+      (c/register c s)
+      (?= (set (e/absorbers s)) #{(c/on-active c) (c/on-close c)})))
+  (with-open [c (channel-with-events :on-active (e/switch))
+              s (e/signal-set)]
+    (c/register c s)
+    (?= (set (e/absorbers s)) #{(c/on-active c)})))
+
+;readable and writeable channels
+
+;;
 ;; Push/pop
 ;;
 
@@ -64,4 +86,4 @@
 ;channel read/write returns result structure (with read/writen info)
 ;channel read/write is co-operations (should provide just one of them)
 
-
+;io channels have writer and reader (and channels themselve)

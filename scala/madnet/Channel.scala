@@ -1,6 +1,9 @@
 package madnet.channel
 import evil_ant.IEvent
 import evil_ant.Closeable
+import evil_ant.ISignal
+import evil_ant.Signal
+import evil_ant.MultiSignalSet
 
 class Channel extends evil_ant.Closeable {
   override def isOpen: Boolean = true
@@ -14,4 +17,11 @@ class Channel extends evil_ant.Closeable {
 
   def isActive: Boolean = true
   def onActive: IEvent = null
+
+  private def registerEvent(e: IEvent, set: MultiSignalSet) = e match {
+    case s: ISignal => set.conj(s)
+    case _ => ()
+  }
+
+  def register(set: MultiSignalSet) { registerEvent(onClose, set); registerEvent(onActive, set) }
 }

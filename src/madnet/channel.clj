@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [pop!]))
 
 ;;
-;; Closeable
+;; State and events
 ;;
 
 (defn open? [channel] (.isOpen channel))
@@ -11,6 +11,8 @@
 
 (defn active? [channel] (.isActive channel))
 (defn on-active [channel] (.onActive channel))
+
+(defn register [channel set] (.register channel set))
 
 ;;
 ;; Reading/writing
