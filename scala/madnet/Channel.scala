@@ -34,8 +34,16 @@ class Channel extends evil_ant.Closeable {
   def register(set: MultiSignalSet) { registerEvent(onClose, set); registerEvent(onActive, set) }
 }
 
-class ReadableChannel extends Channel {
-  def read(ch: Channel) = readImpl(ch) match {
+trait IReadableChannel extends Channel {
+  def read(ch: Channel): Result
+
+  def pop(): AnyRef
+  def popIn(milliseconds: Long): AnyRef
+  def tryPop(): AnyRef
+}
+
+class ReadableChannel extends Channel with IReadableChannel {
+  override def read(ch: Channel) = readImpl(ch) match {
     case null => throw new UnsupportedOperationException
     case r: Result => r
   }
@@ -57,13 +65,58 @@ class ReadableChannel extends Channel {
     if (result != null || System.currentTimeMillis >= timeout) result else _popUntil(timeout)
   }
 
-  def pop(): AnyRef = _pop()
-  def popIn(milliseconds: Long): AnyRef = if(onActive != null) {
+  override def pop(): AnyRef = _pop()
+  override def popIn(milliseconds: Long): AnyRef = if(onActive != null) {
     onActive.emitIn(this, milliseconds)
     tryPop()
   }
   else
     _popUntil(System.currentTimeMillis + milliseconds)
 
-  def tryPop(): AnyRef = throw new UnsupportedOperationException
+  override def tryPop(): AnyRef = throw new UnsupportedOperationException
+}
+
+trait IWritableChannel extends Channel{
+  def write(ch: Channel): Result
+
+  def push(obj: AnyRef): Unit
+  def pushIn(obj: AnyRef, milliseconds: Long): Boolean
+  def tryPush(obj: AnyRef): Boolean
+}
+
+class WritableChannel extends Channel with IWritableChannel {
+  override def write(ch: Channel) = writeImpl(ch) match {
+    case null => throw new UnsupportedOperationException
+    case r: Result => r
+  }
+
+  def writeImpl(ch: Channel): Result = null
+  
+  @tailrec
+  private def _push(obj: AnyRef): Unit = {
+    if(onActive != null)
+      onActive.emit(this)
+
+    val success = tryPush(obj)
+    if(success) () else _push(obj)
+  }
+
+  @tailrec
+  private def _pushUntil(obj: AnyRef, timestamp: Long): Boolean = {
+    if(System.currentTimeMillis >= timestamp) return false
+
+    val success = tryPush(obj)
+    if(success) true else _pushUntil(obj, timestamp)
+  }
+
+  override def push(obj: AnyRef) = _push(obj)
+
+  def pushIn(obj: AnyRef, milliseconds: Long) = if(onActive != null) {
+    onActive.emitIn(this, milliseconds)
+    tryPush(obj)
+  }
+  else
+    _pushUntil(obj, System.currentTimeMillis + milliseconds)
+
+  def tryPush(obj: AnyRef): Boolean = throw new UnsupportedOperationException
 }

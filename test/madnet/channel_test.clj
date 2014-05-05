@@ -2,7 +2,7 @@
   (:require [khazad-dum :refer :all]
             [evil-ant :as e]
             [madnet.channel :as c])
-  (:import [madnet.channel Channel ReadableChannel Result]))
+  (:import [madnet.channel Channel ReadableChannel WritableChannel Result]))
 
 ;;
 ;; Base interface
@@ -126,7 +126,7 @@
     (?emits (c/pop-in! c 10) (c/on-active c) [(c/on-active c) c])))
 
 ;;
-;; Writeable channels
+;; Writable channels
 ;;
 
 ;writeable channels have write methods (throws exception by default)
@@ -134,6 +134,59 @@
 ;writeable channels have push interface
 ;;all functions implemented using tryPush
 ;;default push interface uses onActive
+
+(defn- writable-channel []
+  (let [on-active (e/switch)]
+    (proxy [WritableChannel] []
+      (closeImpl [] nil)
+      (onActive [] on-active)
+      (writeImpl [ch] (if ch (Result. 0 0)))
+      (tryPush [obj] (.ready on-active)))))
+
+(deftest writable-channels-have-write-method
+  (let [c (WritableChannel.)]
+    (?throws (c/write! c c) UnsupportedOperationException))
+  (let [c (writable-channel)]
+    (?throws (c/write! c nil) UnsupportedOperationException)))
+
+(deftest write-returns-result-structure
+  (let [c (writable-channel)]
+    (?= (c/write! c c) (Result/Zero))))
+
+(deftest writable-channels-have-queue-push-interface
+  (let [c (WritableChannel.)]
+    (?throws (c/push! c 42) UnsupportedOperationException)
+    (?throws (c/push-in! c (atom 42) 10) UnsupportedOperationException)
+    (?throws (c/try-push! c "42") UnsupportedOperationException)))
+
+(deftest push-interface-implemented-with-try-push
+  (with-open [c (writable-channel)]
+    (e/turn-on! (c/on-active c))
+    (?true (c/try-push! c 42))
+    (?true (c/push-in! c (atom 42) 10))
+    (c/push! c [42]))
+  (with-open [c (writable-channel)]
+    (let [f (future (c/push-in! c 42 6))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (?= @f false))
+    (let [f (future (c/push-in! c 42 6))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (e/turn-on! (c/on-active c))
+      (?= @f true))
+    (e/turn-off! (c/on-active c))
+    (let [f (future (c/push! c 42))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (e/turn-on! (c/on-active c))
+      (?= @f nil))))
+
+(deftest push-iterface-functions-uses-on-active
+  (with-open [c (writable-channel)]
+    (e/turn-on! (c/on-active c))
+    (?emits (c/push! c 42) (c/on-active c) [(c/on-active c) c])
+    (?emits (c/push-in! c 42 10) (c/on-active c) [(c/on-active c) c])))
 
 ;read and write co-operation
 
