@@ -2,7 +2,7 @@
   (:require [khazad-dum :refer :all]
             [evil-ant :as e]
             [madnet.channel :as c])
-  (:import [madnet.channel Channel]))
+  (:import [madnet.channel Channel ReadableChannel Result]))
 
 ;;
 ;; Base interface
@@ -68,22 +68,80 @@
     (c/register c s)
     (?= (set (e/absorbers s)) #{(c/on-active c)})))
 
-;readable and writeable channels
-
 ;;
-;; Push/pop
+;; Readable channels
 ;;
 
-;channel have default implementation for push/pushIn/pop/popIn
-;channel default implementation for push/pushIn/pop/popIn tries to use events
+(defn- readable-channel []
+  (let [on-active (e/switch)]
+    (proxy [ReadableChannel] []
+      (closeImpl [] nil)
+      (onActive [] on-active)
+      (readImpl [ch] (if ch (Result. 0 0)))
+      (tryPop [] (if (.ready on-active) 42)))))
+
+(deftest readable-channels-have-read-method
+  (let [c (ReadableChannel.)]
+    (?throws (c/read! c c) UnsupportedOperationException))
+  (let [c (readable-channel)]
+    (?throws (c/read! c nil) UnsupportedOperationException)))
+
+(deftest read-returns-result-structure
+  (let [c (readable-channel)]
+    (?= (c/read! c c) (Result/Zero))))
+
+(deftest readable-channels-have-queue-pop-interface
+  (let [c (ReadableChannel.)]
+    (?throws (c/pop! c) UnsupportedOperationException)
+    (?throws (c/pop-in! c 10) UnsupportedOperationException)
+    (?throws (c/try-pop! c) UnsupportedOperationException)))
+
+(deftest pop-interface-implemented-with-try-pop
+  (with-open [c (readable-channel)]
+    (e/turn-on! (c/on-active c))
+    (?= (c/try-pop! c) 42)
+    (?= (c/pop-in! c 10) 42)
+    (?= (c/pop! c) 42))
+  (with-open [c (readable-channel)]
+    (let [f (future (c/pop-in! c 6))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (?= @f nil))
+    (let [f (future (c/pop-in! c 6))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (e/turn-on! (c/on-active c))
+      (?= @f 42))
+    (e/turn-off! (c/on-active c))
+    (let [f (future (c/pop! c))]
+      (Thread/sleep 2)
+      (?false (realized? f))
+      (e/turn-on! (c/on-active c))
+      (?= @f 42))))
+
+(deftest pop-iterface-functions-uses-on-active
+  (with-open [c (readable-channel)]
+    (e/turn-on! (c/on-active c))
+    (?emits (c/pop! c) (c/on-active c) [(c/on-active c) c])
+    (?emits (c/pop-in! c 10) (c/on-active c) [(c/on-active c) c])))
 
 ;;
-;; Read/write
+;; Writeable channels
 ;;
 
-;readable channels are readable, have queue pop interface
-;writeable channels are writeable, have queue push interface
-;channel read/write returns result structure (with read/writen info)
-;channel read/write is co-operations (should provide just one of them)
+;writeable channels have write methods (throws exception by default)
+;;write must return result structure
+;writeable channels have push interface
+;;all functions implemented using tryPush
+;;default push interface uses onActive
 
-;io channels have writer and reader (and channels themselve)
+;read and write co-operation
+
+;;
+;; IO channels
+;;
+
+;have reader and writer
+;have read/write, push/pop methods
+;;have no onAcitve
+;;operations implemented using reader and writer

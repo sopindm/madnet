@@ -25,6 +25,6 @@
 (defn push! [channel obj] (.push channel obj))
 (defn push-in! [channel obj milliseconds] (.pushIn channel obj milliseconds))
 
-(defn tryPop! [channel] (.tryPop channel))
+(defn try-pop! [channel] (.tryPop channel))
 (defn pop! [channel] (.pop channel))
 (defn pop-in! [channel milliseconds] (.popIn channel milliseconds))
