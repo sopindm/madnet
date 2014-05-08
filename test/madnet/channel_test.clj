@@ -2,16 +2,19 @@
   (:require [khazad-dum :refer :all]
             [evil-ant :as e]
             [madnet.channel :as c])
-  (:import [madnet.channel Channel ReadableChannel WritableChannel Result]))
+  (:import [madnet.channel Channel ReadableChannel WritableChannel IOChannel Result]))
 
 ;;
 ;; Base interface
 ;;
 
+(defmacro ?unsupported [& forms]
+  `(do ~@(map (fn [form] `(?throws ~form UnsupportedOperationException)) forms)))
+
 (deftest channels-are-closeable
   (let [c (Channel.)]
     (?true (c/open? c))
-    (?throws (c/close c) UnsupportedOperationException)))
+    (?unsupported (c/close c))))
 
 (deftest channels-have-events
   (let [c (Channel.)]
@@ -24,16 +27,27 @@
 
 (defn- channel-with-events [& {:keys [on-active on-close] :or {on-active (e/event)
                                                                on-close (e/event)}}]
-  (proxy [Channel] []
-    (closeImpl [] nil)
-    (onActive [] on-active)
-    (onClose [] on-close)))
+  (let [open? (atom true)]
+    (proxy [Channel] []
+      (isOpen [] @open?)
+      (closeImpl [] (reset! open? false))
+      (onActive [] on-active)
+      (onClose [] on-close))))
 
 (deftest channels-close-should-close-events
   (let [c (channel-with-events)] 
     (.close c)
     (?false (e/open? (c/on-close c)))
     (?false (e/open? (c/on-active c)))))
+
+(deftest its-safe-to-close-channel-twice
+  (with-open [c (channel-with-events)]
+    (.close c)))
+
+(deftest its-thread-safe-to-close-channel
+  (let [channels (repeatedly 20 #(channel-with-events))
+        futures (doall (repeatedly 100 #(future (Thread/yield) (doseq [c channels] (c/close c)))))]
+    (doall (map deref futures))))
 
 (defmacro ?emit= [form event what]
   `(let [event# ~event
@@ -72,29 +86,41 @@
 ;; Readable channels
 ;;
 
-(defn- readable-channel []
-  (let [on-active (e/switch)]
+(defn- readable-channel [& {:keys [readable] :or {readable true}}]
+  (let [open? (atom true)
+        on-active (e/switch)]
     (proxy [ReadableChannel] []
-      (closeImpl [] nil)
+      (isOpen [] @open?)
+      (closeImpl [] (reset! open? false))
       (onActive [] on-active)
-      (readImpl [ch] (if ch (Result. 0 0)))
+      (readImpl [ch] (if (and readable ch) (Result. 0 1)))
       (tryPop [] (if (.ready on-active) 42)))))
 
+(defn- writable-channel [& {:keys [writable] :or {writable true}}]
+  (let [open? (atom true)
+        on-active (e/switch)]
+    (proxy [WritableChannel] []
+      (isOpen [] @open?)
+      (closeImpl [] (reset! open? false))
+      (onActive [] on-active)
+      (writeImpl [ch] (if (and writable ch) (Result. 1 0)))
+      (tryPush [obj] (.ready on-active)))))
+
 (deftest readable-channels-have-read-method
+  (?unsupported (c/read! (ReadableChannel.) (WritableChannel.))
+                (c/read! (ReadableChannel.) nil)))
+
+(deftest readable-channels-have-reader
   (let [c (ReadableChannel.)]
-    (?throws (c/read! c c) UnsupportedOperationException))
-  (let [c (readable-channel)]
-    (?throws (c/read! c nil) UnsupportedOperationException)))
+    (?= (c/reader c) c)))
 
 (deftest read-returns-result-structure
   (let [c (readable-channel)]
-    (?= (c/read! c c) (Result/Zero))))
+    (?= (c/read! c (writable-channel)) (Result. 0 1))))
 
 (deftest readable-channels-have-queue-pop-interface
   (let [c (ReadableChannel.)]
-    (?throws (c/pop! c) UnsupportedOperationException)
-    (?throws (c/pop-in! c 10) UnsupportedOperationException)
-    (?throws (c/try-pop! c) UnsupportedOperationException)))
+    (?unsupported (c/pop! c) (c/pop-in! c 10) (c/try-pop! c))))
 
 (deftest pop-interface-implemented-with-try-pop
   (with-open [c (readable-channel)]
@@ -129,35 +155,21 @@
 ;; Writable channels
 ;;
 
-;writeable channels have write methods (throws exception by default)
-;;write must return result structure
-;writeable channels have push interface
-;;all functions implemented using tryPush
-;;default push interface uses onActive
-
-(defn- writable-channel []
-  (let [on-active (e/switch)]
-    (proxy [WritableChannel] []
-      (closeImpl [] nil)
-      (onActive [] on-active)
-      (writeImpl [ch] (if ch (Result. 0 0)))
-      (tryPush [obj] (.ready on-active)))))
-
 (deftest writable-channels-have-write-method
+  (?unsupported (c/write! (WritableChannel.) (ReadableChannel.))
+                (c/write! (WritableChannel.) nil)))
+
+(deftest writable-channels-have-writer
   (let [c (WritableChannel.)]
-    (?throws (c/write! c c) UnsupportedOperationException))
-  (let [c (writable-channel)]
-    (?throws (c/write! c nil) UnsupportedOperationException)))
+    (?= (c/writer c) c)))
 
 (deftest write-returns-result-structure
   (let [c (writable-channel)]
-    (?= (c/write! c c) (Result/Zero))))
+    (?= (c/write! c (readable-channel)) (Result. 1 0))))
 
 (deftest writable-channels-have-queue-push-interface
   (let [c (WritableChannel.)]
-    (?throws (c/push! c 42) UnsupportedOperationException)
-    (?throws (c/push-in! c (atom 42) 10) UnsupportedOperationException)
-    (?throws (c/try-push! c "42") UnsupportedOperationException)))
+    (?unsupported (c/push! c 42) (c/push-in! c (atom 42) 10) (c/try-push! c "42"))))
 
 (deftest push-interface-implemented-with-try-push
   (with-open [c (writable-channel)]
@@ -188,13 +200,89 @@
     (?emits (c/push! c 42) (c/on-active c) [(c/on-active c) c])
     (?emits (c/push-in! c 42 10) (c/on-active c) [(c/on-active c) c])))
 
-;read and write co-operation
+(deftest replacing-read-by-write-and-otherwise
+  (?= (c/write! (writable-channel :writable false) (readable-channel)) (Result. 0 1))
+  (?= (c/read! (readable-channel :readable false) (writable-channel)) (Result. 1 0)))
 
 ;;
 ;; IO channels
 ;;
 
-;have reader and writer
-;have read/write, push/pop methods
-;;have no onAcitve
-;;operations implemented using reader and writer
+(deftest io-channels-have-reader-and-writer
+  (let [c (IOChannel.)]
+    (?= (c/reader c) nil)
+    (?= (c/writer c) nil)))
+
+(deftest io-channels-have-read-and-write
+  (let [c (IOChannel.)]
+    (?unsupported (c/write! c (ReadableChannel.))
+                  (c/write! (WritableChannel.) c))))
+
+(deftest io-channels-have-push-and-pop-methods
+  (let [c (IOChannel.)]
+    (?unsupported (c/push! c 123) (c/push-in! c 123 10) (c/try-push! c 123)
+                  (c/pop! c) (c/pop-in! c 10) (c/try-pop! c))))
+
+(deftest io-channels-have-no-on-active
+  (?= (c/on-active (IOChannel.)) nil))
+
+(defn io-channel [& {:keys [reader writer] :or {reader (readable-channel) writer (writable-channel)}}]
+  (let [open? (atom true)
+        on-close (e/event)]
+    (proxy [IOChannel] []
+      (isOpen [] @open?)
+      (closeImpl [] (reset! open? false))
+      (onClose [] on-close)
+      (reader [] reader)
+      (writer [] writer))))
+
+(deftest io-channel-close-closed-reader-and-writer
+  (with-open [c (io-channel)]
+    (?true (instance? ReadableChannel (c/reader c)))
+    (?true (instance? WritableChannel (c/writer c)))
+    (c/close c)
+    (?false (c/open? c))
+    (?false (e/open? (c/on-close c)))
+    (?false (c/open? (c/reader c)))
+    (?false (c/open? (c/writer c)))))
+
+(defn simple-reader []
+  (proxy [ReadableChannel] []
+    (closeImpl [] nil)
+    (readImpl [ch] (Result. 10 11))
+    (pop [] 1)
+    (popIn [time] time)
+    (tryPop [] 3)))
+
+(defn simple-writer []
+  (proxy [WritableChannel] []
+    (closeImpl [] nil)
+    (writeImpl [ch] (Result. 100 111))
+    (push [o] nil)
+    (pushIn [o time] (= (mod time 2) 0))
+    (tryPush [o] (= (mod o 2) 0))))
+
+(deftest reading-from-io-channel
+  (with-open [c (io-channel :reader (simple-reader))]
+    (?= (c/read! c (WritableChannel.)) (Result. 10 11))
+    (?= (c/pop! c) 1)
+    (?= (c/pop-in! c 100500) 100500)
+    (?= (c/try-pop! c) 3)))
+
+(deftest writing-to-io-channel
+  (with-open [c (io-channel :writer (simple-writer))]
+    (?= (c/write! c (ReadableChannel.)) (Result. 100 111))
+    (?= (c/push! c 123) nil)
+    (?= (c/push-in! c 123 102030) true)
+    (?= (c/push-in! c 123 102031) false)
+    (?= (c/try-push! c 123) false)
+    (?= (c/try-push! c 124) true)))
+
+(deftest io-channels-co-operation
+  (?= (c/write! (io-channel) (readable-channel :readable false)) (Result. 1 0))
+  (?= (c/write! (io-channel :writer (writable-channel :writable false)) (readable-channel))
+      (Result. 0 1))
+  (?= (c/read! (io-channel) (writable-channel :writable false)) (Result. 0 1))
+  (?= (c/read! (io-channel :reader (readable-channel :readable false)) (writable-channel))
+      (Result. 1 0)))
+

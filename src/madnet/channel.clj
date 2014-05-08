@@ -28,3 +28,6 @@
 (defn try-pop! [channel] (.tryPop channel))
 (defn pop! [channel] (.pop channel))
 (defn pop-in! [channel milliseconds] (.popIn channel milliseconds))
+
+(defn reader [io-channel] (.reader io-channel))
+(defn writer [io-channel] (.writer io-channel))
