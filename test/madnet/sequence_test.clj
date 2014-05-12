@@ -3,7 +3,8 @@
             [madnet.channel-test :refer [?unsupported]]
             [madnet.channel :as c] 
             [madnet.sequence :as s])
-  (:import [madnet.sequence Sequence ReadableSequence]))
+  (:import [madnet.channel Result]
+           [madnet.sequence Sequence ReadableSequence WritableSequence]))
 
 ;;
 ;; Sequence
@@ -89,14 +90,46 @@
   (let [s (readable-sequence (range 10))]
     (?= (seq s) (seq (range 10)))))
 
-;readable sequence
-;;default read implementation can write to any writable sequence (using set)
+;;
+;; Writable sequence
+;;
 
-;writable sequence
-;;has random set access
-;;default set implementation throws indexoutofrange
-;;default push implementation uses set and expand (check zero free-space case)
-;;default write implementation can read from any readable sequence (using get)
+(deftest writable-sequencies-have-random-set-access
+  (let [s (WritableSequence.)]
+    (?unsupported (s/set! s 42 100500))))
+
+(defn writable-sequence
+  ([seq] (writable-sequence seq (count seq)))
+  ([seq size] (writable-sequence seq 0 size))
+  ([seq begin size]
+     (let [seq (atom seq) begin (atom begin) size (atom size)]
+       (proxy [WritableSequence Iterable] []
+         (size [] @size)
+         (freeSpace [] (- (count @seq) @begin @size))
+         (expand [n] (swap! size + n))
+         (set [n value] (let [n (+ n @begin)]
+                          (swap! seq #(concat (take n %) [value] (drop (inc n) %)))))
+         (iterator [] (.iterator @seq))))))
+
+(deftest writable-sequence-push-implementation-uses-set-and-expand
+  (let [s (writable-sequence (repeat 2 nil) 0)]
+    (?= (c/try-push! s 100) true)
+    (?= (c/try-push! s 500) true)
+    (?= (c/try-push! s 100500) false)
+    (?= (seq s) [100 500])))
+
+(deftest default-read-implementation-can-write-to-writable-sequence
+  (let [reader (readable-sequence (range 5))
+        writer (writable-sequence (repeat 10 nil) 2)]
+    (?= (c/read! reader writer) (Result. 5))
+    (?= (seq reader) nil)
+    (?= (seq writer)
+        (seq (concat (repeat 2 nil) (range 5) (repeat 3 nil)))))
+  (let [reader (readable-sequence (range 10) 2 5)
+        writer (writable-sequence (repeat 5 nil) 1 1)]
+    (?= (c/read! reader writer) (Result. 3))
+    (?= (seq reader) (range 5 7))
+    (?= (seq writer) (seq (concat [nil nil] (range 2 5))))))
 
 ;buffer (sequence factory)
 ;sequence factory function

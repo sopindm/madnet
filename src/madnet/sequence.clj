@@ -25,3 +25,4 @@
 ;;
 
 (defn get [seq n] (.get seq n))
+(defn set! [seq n value] (.set seq n value))

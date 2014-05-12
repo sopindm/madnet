@@ -39,4 +39,40 @@ class ReadableSequence extends madnet.channel.ReadableChannel with ISequence
     override def next() = { val current = get(position); position += 1; current }
     override def remove() { throw new UnsupportedOperationException }
   }
+
+  override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
+    case w: WritableSequence => Sequence.write(w, this)
+    case _ => null
+  }
+}
+
+object Sequence {
+  private[sequence] 
+  def write(to: WritableSequence, from: ReadableSequence) = {
+    val size = scala.math.min(to.freeSpace, from.size)
+    val pushOffset = to.size
+    to.expand(size)
+
+    for(i <- 0 until size) to.set(pushOffset + i, from.get(i))
+    from.drop(size)
+
+    new madnet.channel.Result(size)
+  }
+}
+
+class WritableSequence extends madnet.channel.WritableChannel with ISequence {
+  def set(n: Int, value: Any): Unit = throw new UnsupportedOperationException
+
+  override def tryPush(value: Any): Boolean = {
+    if(freeSpace == 0) return false
+
+    expand(1)
+    set(size - 1, value)
+    true
+  }
+
+  override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
+    case r: ReadableSequence => Sequence.write(this, r)
+    case _ => null
+  }
 }

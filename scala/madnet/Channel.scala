@@ -7,7 +7,9 @@ import evil_ant.Signal
 import evil_ant.MultiSignalSet
 import scala.annotation.tailrec
 
-final case class Result(val read: Long, val writen: Long)
+final case class Result(val read: Long, val writen: Long) {
+  def this(total: Long) = this(total, total)
+}
 
 object Result {
   val Zero = new Result(0, 0)
