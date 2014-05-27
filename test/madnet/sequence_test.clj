@@ -74,7 +74,7 @@
 (defn readable-sequence
   ([seq] (readable-sequence seq (count seq)))
   ([seq size] (readable-sequence seq 0 size))
-  ([seq begin size]
+  ([seq begin size & [result]]
      (let [begin (atom begin) size (atom size)]
        (proxy [ReadableSequence] []
          (size [] @size)
@@ -82,7 +82,8 @@
          (freeSpace [] (- (count seq) @begin @size))
          (drop [n] (swap! begin + n) (swap! size - n))
          (expand [n] (swap! size + n))
-         (get [n] (nth seq (+ @begin n)))))))
+         (get [n] (nth seq (+ @begin n)))
+         (readImpl [ch] (or result (proxy-super readImpl ch)))))))
 
 (deftest readable-sequence-default-pop-implementation-uses-get-and-drop
   (let [s (readable-sequence (range 2))]
@@ -105,7 +106,7 @@
 (defn writable-sequence
   ([seq] (writable-sequence seq (count seq)))
   ([seq size] (writable-sequence seq 0 size))
-  ([seq begin size]
+  ([seq begin size & [result]]
      (let [seq (atom seq) begin (atom begin) size (atom size)]
        (proxy [WritableSequence Iterable] []
          (begin [] @begin)
@@ -115,7 +116,8 @@
          (expand [n] (swap! size + n))
          (set [n value] (let [n (+ n @begin)]
                           (swap! seq #(concat (take n %) [value] (drop (inc n) %)))))
-         (iterator [] (.iterator @seq))))))
+         (iterator [] (.iterator @seq))
+         (writeImpl [ch] (or result (proxy-super writeImpl ch)))))))
 
 (deftest writable-sequence-push-implementation-uses-set-and-expand
   (let [s (writable-sequence (repeat 3 nil) 2)]
@@ -141,9 +143,8 @@
 ;; IO Sequences
 ;;
 
-(comment
-(defn io-sequence [reader writer]
-  (proxy [IOSequence] []
+(defn io-sequence [reader writer & {:keys [linked] :or {linked false}}]
+  (proxy [IOSequence] [linked]
     (reader [] reader)
     (writer [] writer)))
 
@@ -185,16 +186,45 @@
 
 (deftest io-sequence-read-reads-from-reader
   (let [s (io-sequence (readable-sequence (range 5)) nil)
-        writer (writable-sequence (repeat 5 nil))])))
+        writer (writable-sequence (repeat 3 nil))]
+    (?= (c/read! s writer) (Result. 3 3))
+    (?sequence= (c/reader s) 3 2)))
 
-;io sequence
-;;reads from reader
-;;write expands reader
+(deftest io-sequence-write-writes-to-writer
+  (let [s (io-sequence nil (writable-sequence (repeat 5 nil)))
+        reader (readable-sequence (repeat 3 nil))]
+    (?= (c/write! s reader) (Result. 3 3))
+    (?sequence= (c/writer s) 3 2)))
 
-;linked io sequence
-;;drops from reader expands writer
-;;expanding writer drops from reader
-;;read expands writer
+(deftest io-sequence-write-expands-reader
+  (let [s (io-sequence (readable-sequence (range 5) 2) (writable-sequence (repeat 3 nil)))
+        reader (readable-sequence (range -10 0))]
+    (?= (c/write! s reader) (Result. 3 3))
+    (?sequence= (c/writer s) 3 0)
+    (?sequence= (c/reader s) 0 5)
+    (?= (seq s) (seq (range 5)))))
+
+(deftest droping-from-linked-io-sequence
+  (let [s (io-sequence (readable-sequence (repeat 10 nil) 1 4)
+                       (writable-sequence (repeat 10 nil) 2 7) :linked true)]
+    (s/drop! 3 s)
+    (?sequence= (c/reader s) 4 1)
+    (?sequence= (c/writer s) 2 10)))
+
+(deftest expanding-linked-io-sequence
+  (let [s (io-sequence (readable-sequence (repeat 10 nil) 1 7)
+                       (writable-sequence (repeat 10 nil) 2 4) :linked true)]
+    (s/expand! 3 s)
+    (?sequence= (c/reader s) 4 4)
+    (?sequence= (c/writer s) 2 7)))
+
+(deftest reading-from-linked-io-sequence-expands-writer
+  (let [s (io-sequence (readable-sequence (range 5)) (writable-sequence (repeat 10 nil) 5) :linked true)
+        writer (writable-sequence (repeat 10 nil))]
+    (?= (c/read! s writer) (Result. 5 5))
+    (?sequence= (c/writer s) 0 10)))
+
+;io-sequence read/write with no-symmetric result
 
 ;sequence features
 ;;buffer (sequence factory)
