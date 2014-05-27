@@ -42,6 +42,11 @@ class ReadableSequence extends madnet.channel.ReadableChannel with ISequence
     override def remove() { throw new UnsupportedOperationException }
   }
 
+  override def canRead(ch: madnet.channel.IWritableChannel) = ch match {
+    case s: WritableSequence => true
+    case _ => false
+  }
+
   override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
     case w: WritableSequence => Sequence.write(w, this)
     case _ => null
@@ -68,6 +73,11 @@ class WritableSequence extends madnet.channel.WritableChannel with ISequence {
     set(0, value)
     drop(1)
     true
+  }
+
+  override def canWrite(ch: madnet.channel.IWritableChannel) = ch match {
+    case s: ReadableSequence => true
+    case _ => false
   }
 
   override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {

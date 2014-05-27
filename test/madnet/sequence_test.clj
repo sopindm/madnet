@@ -141,6 +141,7 @@
 ;; IO Sequences
 ;;
 
+(comment
 (defn io-sequence [reader writer]
   (proxy [IOSequence] []
     (reader [] reader)
@@ -184,7 +185,7 @@
 
 (deftest io-sequence-read-reads-from-reader
   (let [s (io-sequence (readable-sequence (range 5)) nil)
-        writer (writable-sequence (repeat 5 nil))]))
+        writer (writable-sequence (repeat 5 nil))])))
 
 ;io sequence
 ;;reads from reader
