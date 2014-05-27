@@ -40,40 +40,13 @@ class Channel extends evil_ant.Closeable {
   def register(set: MultiSignalSet) { registerEvent(onClose, set); registerEvent(onActive, set) }
 }
 
-object Channel {
-  @tailrec 
-  private[channel] def concreteReader(ch: IReadableChannel): IReadableChannel =
-    if(ch == null) null else ch.reader match {
-      case `ch` => ch
-      case null => null
-      case reader: IReadableChannel => concreteReader(reader)
-    }
-
-  @tailrec
-  private[channel] def concreteWriter(ch: IWritableChannel): IWritableChannel =
-    if(ch == null) null else ch.writer match {
-      case `ch` => ch
-      case null => null
-      case writer: IWritableChannel => concreteWriter(writer)
-    }
-}
-
 trait IReadableChannel extends Channel {
-  def reader: IReadableChannel
+  def canRead(ch: IWritableChannel): Boolean = false
 
   def read(ch: IWritableChannel): Result = {
-    val reader = Channel.concreteReader(this)
-    val writer = Channel.concreteWriter(ch)
-
-    if(reader == null || writer == null) throw new UnsupportedOperationException
-
-    reader.readImpl(writer) match {
-      case null => writer.writeImpl(reader) match {
-        case null => throw new UnsupportedOperationException
-        case r: Result => r
-      }
-      case r: Result => r
-    }
+    if(canRead(ch)) readImpl(ch)
+    else if(ch != null && ch.canWrite(this)) ch.writeImpl(this)
+    else throw new UnsupportedOperationException
   }
 
   def readImpl(ch: IWritableChannel) : Result = null
@@ -84,8 +57,6 @@ trait IReadableChannel extends Channel {
 }
 
 class ReadableChannel extends Channel with IReadableChannel {
-  override def reader = this
-
   @tailrec
   private def _pop(): Any = {
     if(onActive != null)
@@ -113,21 +84,12 @@ class ReadableChannel extends Channel with IReadableChannel {
 }
 
 trait IWritableChannel extends Channel{
-  def writer: IWritableChannel
+  def canWrite(ch: IReadableChannel): Boolean = false
 
   def write(ch: IReadableChannel): Result = {
-    val writer = Channel.concreteWriter(this)
-    val reader = Channel.concreteReader(ch)
-
-    if(writer == null || reader == null) throw new UnsupportedOperationException
-
-    writer.writeImpl(reader) match {
-      case null => reader.readImpl(writer) match {
-        case null => throw new UnsupportedOperationException
-        case r: Result => r
-      }
-      case r: Result => r
-    }
+    if(canWrite(ch)) writeImpl(ch)
+    else if(ch != null && ch.canRead(this)) ch.readImpl(this)
+    else throw new UnsupportedOperationException
   }
 
   def writeImpl(ch: IReadableChannel): Result = null
@@ -138,8 +100,6 @@ trait IWritableChannel extends Channel{
 }
 
 class WritableChannel extends Channel with IWritableChannel {
-  override def writer = this
-
   @tailrec
   private def _push(obj: Any): Unit = {
     if(onActive != null)
@@ -170,8 +130,8 @@ class WritableChannel extends Channel with IWritableChannel {
 }
 
 class IOChannel extends Channel with IReadableChannel with IWritableChannel {
-  override def reader: IReadableChannel = null
-  override def writer: IWritableChannel = null
+  def reader: IReadableChannel = null
+  def writer: IWritableChannel = null
 
   override def close() = {
     if(reader != null) reader.close()
@@ -181,6 +141,26 @@ class IOChannel extends Channel with IReadableChannel with IWritableChannel {
 
   private[this] def requireReader { if(reader == null) throw new UnsupportedOperationException }
   private[this] def requireWriter { if(writer == null) throw new UnsupportedOperationException }
+
+  override def canRead(ch: IWritableChannel) =
+    if(reader != null && reader.canRead(ch)) true
+    else if(ch != null && ch.canWrite(reader)) true
+    else false
+
+  override def canWrite(ch: IReadableChannel) = 
+    if(writer != null && writer.canWrite(ch)) true
+    else if(ch != null && ch.canRead(writer)) true
+    else false
+
+  override def readImpl(ch: IWritableChannel) = 
+    if(reader != null && reader.canRead(ch)) reader.readImpl(ch)
+    else if(ch != null && ch.canWrite(reader)) ch.writeImpl(reader)
+    else null
+
+  override def writeImpl(ch: IReadableChannel) =
+    if(writer != null && writer.canWrite(ch)) writer.writeImpl(ch)
+    else if(ch != null && ch.canRead(writer)) ch.readImpl(writer)
+    else null
 
   override def push(obj: Any) = { requireWriter; writer.push(obj) }
   override def pushIn(obj: Any, milliseconds: Long) = {

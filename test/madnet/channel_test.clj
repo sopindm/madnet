@@ -93,6 +93,7 @@
       (isOpen [] @open?)
       (closeImpl [] (reset! open? false))
       (onActive [] on-active)
+      (canRead [ch] (and readable (instance? WritableChannel ch)))
       (readImpl [ch] (if (and readable ch) (Result. 0 1)))
       (tryPop [] (if (.ready on-active) 42)))))
 
@@ -103,16 +104,13 @@
       (isOpen [] @open?)
       (closeImpl [] (reset! open? false))
       (onActive [] on-active)
+      (canWrite [ch] (and writable (instance? ReadableChannel ch)))
       (writeImpl [ch] (if (and writable ch) (Result. 1 0)))
       (tryPush [obj] (.ready on-active)))))
 
 (deftest readable-channels-have-read-method
   (?unsupported (c/read! (ReadableChannel.) (WritableChannel.))
                 (c/read! (ReadableChannel.) nil)))
-
-(deftest readable-channels-have-reader
-  (let [c (ReadableChannel.)]
-    (?= (c/reader c) c)))
 
 (deftest read-returns-result-structure
   (let [c (readable-channel)]
@@ -158,10 +156,6 @@
 (deftest writable-channels-have-write-method
   (?unsupported (c/write! (WritableChannel.) (ReadableChannel.))
                 (c/write! (WritableChannel.) nil)))
-
-(deftest writable-channels-have-writer
-  (let [c (WritableChannel.)]
-    (?= (c/writer c) c)))
 
 (deftest write-returns-result-structure
   (let [c (writable-channel)]
@@ -249,6 +243,7 @@
 (defn simple-reader []
   (proxy [ReadableChannel] []
     (closeImpl [] nil)
+    (canRead [ch] true)
     (readImpl [ch] (Result. 10 11))
     (pop [] 1)
     (popIn [time] time)
@@ -257,6 +252,7 @@
 (defn simple-writer []
   (proxy [WritableChannel] []
     (closeImpl [] nil)
+    (canWrite [ch] true)
     (writeImpl [ch] (Result. 100 111))
     (push [o] nil)
     (pushIn [o time] (= (mod time 2) 0))
@@ -285,4 +281,3 @@
   (?= (c/read! (io-channel) (writable-channel :writable false)) (Result. 0 1))
   (?= (c/read! (io-channel :reader (readable-channel :readable false)) (writable-channel))
       (Result. 1 0)))
-

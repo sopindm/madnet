@@ -16,6 +16,8 @@
 ;; Sequence modifiers
 ;;
 
+(defn clone [seq] (.clone seq))
+
 (defn take! [n seq] (.take seq n) seq)
 (defn drop! [n seq] (.drop seq n) seq)
 (defn expand! [n seq] (.expand seq n) seq)

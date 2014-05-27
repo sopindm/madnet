@@ -1,6 +1,8 @@
 package madnet.sequence
 
-trait ISequence extends madnet.channel.Channel {
+trait ISequence extends madnet.channel.Channel with Cloneable {
+  override def clone: ISequence = throw new UnsupportedOperationException
+
   def begin: Int = throw new UnsupportedOperationException
   protected def begin_=(n: Int): Unit = throw new UnsupportedOperationException
 
@@ -49,12 +51,11 @@ class ReadableSequence extends madnet.channel.ReadableChannel with ISequence
 object Sequence {
   private[sequence] 
   def write(to: WritableSequence, from: ReadableSequence) = {
-    val size = scala.math.min(to.freeSpace, from.size)
-    val pushOffset = to.size
-    to.expand(size)
+    val size = scala.math.min(to.size, from.size)
 
-    for(i <- 0 until size) to.set(pushOffset + i, from.get(i))
+    for(i <- 0 until size) to.set(i, from.get(i))
     from.drop(size)
+    to.drop(size)
 
     new madnet.channel.Result(size)
   }
@@ -63,11 +64,9 @@ object Sequence {
 class WritableSequence extends madnet.channel.WritableChannel with ISequence {
   def set(n: Int, value: Any): Unit = throw new UnsupportedOperationException
 
-  override def tryPush(value: Any): Boolean = {
-    if(freeSpace == 0) return false
-
-    expand(1)
-    set(size - 1, value)
+  override def tryPush(value: Any): Boolean = if(size == 0) false else {
+    set(0, value)
+    drop(1)
     true
   }
 
@@ -75,4 +74,21 @@ class WritableSequence extends madnet.channel.WritableChannel with ISequence {
     case r: ReadableSequence => Sequence.write(this, r)
     case _ => null
   }
+}
+
+class IOSequence extends madnet.channel.IOChannel with ISequence with java.lang.Iterable[Any] {
+  override def reader: ReadableSequence = throw new UnsupportedOperationException
+  override def writer: WritableSequence = throw new UnsupportedOperationException
+
+  override def begin = reader.begin
+  override def size = reader.size
+  override def freeSpace = writer.freeSpace
+
+  override def take(n: Int) { throw new UnsupportedOperationException }
+  override def drop(n: Int) = reader.drop(n)
+  override def expand(n: Int) = writer.expand(n)
+
+  override def iterator = reader.iterator
+
+  override def tryPush(o: Any) = if(writer.tryPush(o)) { reader.expand(1); true } else false
 }
