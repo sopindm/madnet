@@ -15,7 +15,7 @@ object Result {
   val Zero = new Result(0, 0)
 }
 
-class Channel extends evil_ant.Closeable {
+trait IChannel extends evil_ant.Closeable {
   override def isOpen: Boolean = true
   override def close(): Unit = {
     if(onClose != null) onClose.synchronized {
@@ -40,7 +40,9 @@ class Channel extends evil_ant.Closeable {
   def register(set: MultiSignalSet) { registerEvent(onClose, set); registerEvent(onActive, set) }
 }
 
-trait IReadableChannel extends Channel {
+class Channel extends IChannel
+
+trait IReadableChannel extends IChannel {
   def canRead(ch: IWritableChannel): Boolean = false
 
   def read(ch: IWritableChannel): Result = {
@@ -56,7 +58,7 @@ trait IReadableChannel extends Channel {
   def tryPop(): Any
 }
 
-class ReadableChannel extends Channel with IReadableChannel {
+trait IReadableChannelLike extends IReadableChannel {
   @tailrec
   private def _pop(): Any = {
     if(onActive != null)
@@ -83,7 +85,9 @@ class ReadableChannel extends Channel with IReadableChannel {
   override def tryPop(): Any = throw new UnsupportedOperationException
 }
 
-trait IWritableChannel extends Channel{
+class ReadableChannel extends Channel with IReadableChannelLike
+
+trait IWritableChannel extends IChannel {
   def canWrite(ch: IReadableChannel): Boolean = false
 
   def write(ch: IReadableChannel): Result = {
@@ -99,7 +103,7 @@ trait IWritableChannel extends Channel{
   def tryPush(obj: Any): Boolean
 }
 
-class WritableChannel extends Channel with IWritableChannel {
+trait IWritableChannelLike extends IWritableChannel {
   @tailrec
   private def _push(obj: Any): Unit = {
     if(onActive != null)
@@ -129,7 +133,9 @@ class WritableChannel extends Channel with IWritableChannel {
   override def tryPush(obj: Any): Boolean = throw new UnsupportedOperationException
 }
 
-class IOChannel extends Channel with IReadableChannel with IWritableChannel {
+class WritableChannel extends Channel with IWritableChannelLike
+
+trait IIOChannel extends IChannel with IReadableChannel with IWritableChannel {
   def reader: IReadableChannel = null
   def writer: IWritableChannel = null
 
@@ -171,3 +177,5 @@ class IOChannel extends Channel with IReadableChannel with IWritableChannel {
   override def popIn(milliseconds: Long) = { requireReader; reader.popIn(milliseconds) }
   override def tryPop() = { requireReader; reader.tryPop() }
 }
+
+class IOChannel extends Channel with IIOChannel

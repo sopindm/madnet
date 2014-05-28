@@ -4,7 +4,9 @@
             [madnet.channel :as c] 
             [madnet.sequence :as s])
   (:import [madnet.channel Result]
-           [madnet.sequence Sequence ReadableSequence WritableSequence IOSequence]))
+           [madnet.sequence Sequence ReadableSequence WritableSequence IOSequence
+                            ObjectSequence ReadableObjectSequence WritableObjectSequence
+                            NIOSequence]))
 
 ;;
 ;; Sequence
@@ -188,7 +190,11 @@
   (let [s (io-sequence (readable-sequence (range 5)) nil)
         writer (writable-sequence (repeat 3 nil))]
     (?= (c/read! s writer) (Result. 3 3))
-    (?sequence= (c/reader s) 3 2)))
+    (?sequence= (c/reader s) 3 2))
+  (let [s (io-sequence (readable-sequence (range 5)) (writable-sequence (range 5)))
+        writer (writable-sequence (repeat 3 nil))]
+    (c/read! s writer)
+    (?sequence= (c/writer s) 0 5)))
 
 (deftest io-sequence-write-writes-to-writer
   (let [s (io-sequence nil (writable-sequence (repeat 5 nil)))
@@ -224,22 +230,88 @@
     (?= (c/read! s writer) (Result. 5 5))
     (?sequence= (c/writer s) 0 10)))
 
-;io-sequence read/write with no-symmetric result
+(deftest io-sequence-read-with-no-symmetric-result
+  (let [s (io-sequence (readable-sequence (range 5) 0 5 (Result. 3 4))
+                       (writable-sequence (range 10) 1 2) :linked true)]
+    (?= (c/read! s (writable-sequence (range 5))) (Result. 3 4))
+    (?sequence= (c/writer s) 1 5)))
 
-;sequence features
+(deftest io-sequence-write-with-no-symmetric-result
+  (let [s (io-sequence (readable-sequence (range 10) 2 3)
+                       (writable-sequence (range 5) 0 5 (Result. 2 4)))]
+    (?= (c/write! s (readable-sequence (range 100))) (Result. 2 4))
+    (?sequence= (c/reader s) 2 7)))
+
+;;
+;; Object sequence
+;;
+
+(deftest object-sequence-begin-size-and-free-space
+  (?sequence= (ObjectSequence. (object-array 100) 15 62) 15 62 23)
+  (?throws (ObjectSequence. (object-array 10) 5 10) IllegalArgumentException))
+
+(deftest object-sequence-taking-and-droping
+  (?sequence= (s/take! 15 (ObjectSequence. (object-array 100) 8 28)) 8 15)
+  (?sequence= (s/drop! 20 (ObjectSequence. (object-array 100) 10 50)) 30 30))
+
+(deftest accessing-readable-object-sequences
+  (let [s (ReadableObjectSequence. (object-array (range -50 50)) 10 40)]
+    (dotimes [i 40] (?= (s/get s i) (- i 40)))
+    (?throws (s/get s -1) ArrayIndexOutOfBoundsException)
+    (?throws (s/get s 40) ArrayIndexOutOfBoundsException)))
+
+(deftest accessing-writable-object-sequences
+  (let [o (object-array 100)
+        s (WritableObjectSequence. o 20 30)]
+    (dotimes [i 30] (s/set! s i (- i)))
+    (?= (seq (take 30 (drop 20 (seq o)))) (seq (map #(- %) (range 0 30))))
+    (?throws (s/set! s -1 0) ArrayIndexOutOfBoundsException)
+    (?throws (s/set! s 30 0) ArrayIndexOutOfBoundsException)))
+
+(deftest object-sequencies-cannot-store-nulls
+  (?throws (s/set! (WritableObjectSequence. (object-array 10) 0 10) 0 nil) IllegalArgumentException))
+
+;;
+;; NIO sequence
+;;
+
+(deftest nio-sequence-begin-size-and-free-space
+  (?sequence= (NIOSequence. (-> (java.nio.ByteBuffer/allocate 100) (.position 10) (.limit 60)))
+               10 50 40))
+
+(deftest nio-sequence-taking-and-droping
+  (?sequence= (s/take! 20 (NIOSequence. (java.nio.ByteBuffer/allocate 50))) 0 20 30)
+  (?sequence= (s/drop! 10 (NIOSequence. (java.nio.ByteBuffer/allocate 50))) 10 40 0))
+
+;;
+;; Byte sequence
+;;
+
+;byte range get, set, specialized read and write
+
+;;
+;; Char sequence
+;;
+
+;char range get, set, specialized read and write
+
+;byte to char and back converion methods
+
+;;
+;;sequence features
+;;
+
 ;;buffer (sequence factory)
 ;;factory function
 ;;thread safety
 ;;auto-close read on emptyness
 ;;auto-close write on fullness
 ;;immutable take, drop and expand
+;;events
 
-;circular ranges
+;;
+;;circular ranges
+;;
+
 ;;circular ranges reuse beginning of underlying buffer
 ;;circular ranges can have compaction ratio
-
-;concrete ranges
-;;byte ranges (over nio byte buffers)
-;;char ranges (over nio char buffers)
-;;object ranges
-;;;object ranges cannot store nulls
