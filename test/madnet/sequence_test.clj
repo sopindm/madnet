@@ -376,7 +376,51 @@
     (c/write! writer reader)
     (?= (take 5 (seq (.array buffer))) (seq "hello"))))
 
-;byte to char and back converion methods
+;;
+;; bytes/chars conversion
+;;
+
+(defn- unicode-charset [] (java.nio.charset.Charset/forName "UTF-8"))
+
+(deftest converting-simple-byte-sequence-to-chars
+  (let [reader (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 97 100)))))
+        buffer (CharBuffer/allocate 3)
+        writer (WritableCharSequence. buffer)]
+    (?= (.writeBytes writer reader (unicode-charset)) (Result. 3 3))
+    (?sequence= reader 3 0 0)
+    (?sequence= writer 3 0 0)
+    (?= (seq (.array buffer)) (seq "abc"))))
+
+(deftest converting-big-byte-sequence-to-char
+  (let [reader (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte [-48 -102]))))
+        buffer (CharBuffer/allocate 1)
+        writer (WritableCharSequence. buffer)]
+    (?= (.writeBytes writer reader (unicode-charset)) (Result. 2 1))
+    (?= (int (.get buffer 0)) 1050)))
+
+(deftest converting-chars-to-bytes
+  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array "hi!!!")))
+        buffer (ByteBuffer/allocate 5)
+        writer (WritableByteSequence. buffer)]
+    (?= (.readBytes reader writer (unicode-charset)) (Result. 5 5))
+    (?sequence= reader 5 0 0)
+    (?sequence= writer 5 0 0)
+    (?= (seq (.array buffer)) [104 105 33 33 33])))
+
+(deftest converting-big-char-to-bytes
+  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array [(char 1050)])))
+        buffer (ByteBuffer/allocate 2)
+        writer (WritableByteSequence. buffer)]
+    (?= (.readBytes reader writer (unicode-charset)) (Result. 1 2))
+    (?sequence= reader 1 0 0)
+    (?sequence= writer 2 0 0)
+    (?= (seq (.array buffer)) [-48 -102])))
+
+;chars to bytes (equal size)
+;chars to bytes (not enought space in byte buffer)
+;chars to bytes (too much space in byte buffer)
+;chars to bytes (not 1 to 1)
+;chars to bytes (not enough space for last char)
 
 ;;
 ;;sequence features

@@ -1,5 +1,9 @@
 package madnet.sequence
 
+import java.nio.charset.Charset
+import java.nio.charset.CharsetDecoder
+import java.nio.charset.CharsetEncoder
+
 class NIOSequence(buffer: java.nio.Buffer) extends Sequence {
   override def begin = buffer.position
   override def begin_=(i: Int) = {
@@ -83,6 +87,16 @@ class ReadableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(
     case ws: WritableCharSequence => CharSequence.write(ws, this)
     case _ => super.readImpl(ch)
   }
+
+  def readBytes(s: WritableByteSequence, charset: Charset) = {
+    val charBegin = begin
+    val byteBegin = s.begin
+
+    val result = charset.newEncoder.encode(buffer, s.buffer, true)
+    if(result.isError) throw new java.nio.charset.CharacterCodingException
+
+    new madnet.channel.Result(begin - charBegin, s.begin - byteBegin)
+  }
 }
 
 class WritableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(buffer)
@@ -101,5 +115,15 @@ class WritableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(
   override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
     case rs: ReadableCharSequence => CharSequence.write(this, rs)
     case _ => super.writeImpl(ch)
+  }
+
+  def writeBytes(s: ReadableByteSequence, charset: Charset) = {
+    val charBegin = begin
+    val byteBegin = s.begin
+
+    val result = charset.newDecoder.decode( s.buffer, buffer, true)
+    if(result.isError) throw new java.nio.charset.CharacterCodingException
+
+    new madnet.channel.Result(s.begin - byteBegin, begin - charBegin)
   }
 }
