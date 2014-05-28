@@ -43,12 +43,12 @@ trait IReadableSequence extends ISequence with madnet.channel.IReadableChannelLi
   }
 
   override def canRead(ch: madnet.channel.IWritableChannel) = ch match {
-    case s: WritableSequence => true
+    case s: IWritableSequence => true
     case _ => false
   }
 
   override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
-    case w: WritableSequence => Sequence.write(w, this)
+    case w: IWritableSequence => Sequence.write(w, this)
     case _ => null
   }
 }
@@ -78,12 +78,12 @@ trait IWritableSequence extends ISequence with madnet.channel.IWritableChannelLi
   }
 
   override def canWrite(ch: madnet.channel.IReadableChannel) = ch match {
-    case s: ReadableSequence => true
+    case s: IReadableSequence => true
     case _ => false
   }
 
   override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
-    case r: ReadableSequence => Sequence.write(this, r)
+    case r: IReadableSequence => Sequence.write(this, r)
     case _ => null
   }
 }

@@ -3,10 +3,13 @@
             [madnet.channel-test :refer [?unsupported]]
             [madnet.channel :as c] 
             [madnet.sequence :as s])
-  (:import [madnet.channel Result]
+  (:import [java.nio ByteBuffer CharBuffer]
+            [madnet.channel Result]
            [madnet.sequence Sequence ReadableSequence WritableSequence IOSequence
                             ObjectSequence ReadableObjectSequence WritableObjectSequence
-                            NIOSequence]))
+                            NIOSequence
+                            ReadableByteSequence WritableByteSequence
+                            ReadableCharSequence WritableCharSequence]))
 
 ;;
 ;; Sequence
@@ -276,24 +279,102 @@
 ;;
 
 (deftest nio-sequence-begin-size-and-free-space
-  (?sequence= (NIOSequence. (-> (java.nio.ByteBuffer/allocate 100) (.position 10) (.limit 60)))
+  (?sequence= (NIOSequence. (-> (ByteBuffer/allocate 100) (.position 10) (.limit 60)))
                10 50 40))
 
 (deftest nio-sequence-taking-and-droping
-  (?sequence= (s/take! 20 (NIOSequence. (java.nio.ByteBuffer/allocate 50))) 0 20 30)
-  (?sequence= (s/drop! 10 (NIOSequence. (java.nio.ByteBuffer/allocate 50))) 10 40 0))
+  (?sequence= (s/take! 20 (NIOSequence. (ByteBuffer/allocate 50))) 0 20 30)
+  (?sequence= (s/drop! 10 (NIOSequence. (ByteBuffer/allocate 50))) 10 40 0))
 
 ;;
 ;; Byte sequence
 ;;
 
-;byte range get, set, specialized read and write
+(deftest byte-sequence-get
+  (let [buffer (ByteBuffer/wrap (byte-array (map byte (range -10 10))))
+        s (ReadableByteSequence. (-> buffer (.position 5) (.limit 15)))]
+    (dotimes [i 10] (?= (s/get s i) (- i 5)))
+    (?throws (s/get s -1) ArrayIndexOutOfBoundsException)
+    (?throws (s/get s 10) ArrayIndexOutOfBoundsException)))
+
+(deftest byte-sequence-set
+  (let [buffer (-> (ByteBuffer/allocate 20) (.position 7) (.limit 13))
+        s (WritableByteSequence. buffer)]
+    (dotimes [i 6] (s/set! s i (byte (- i))))
+    (dotimes [i 6] (?= (.get buffer (+ i 7)) (- i)))
+    (?throws (s/set! s -1 0) ArrayIndexOutOfBoundsException)
+    (?throws (s/set! s 6 0) ArrayIndexOutOfBoundsException)
+    (?throws (s/set! s 1 \0) IllegalArgumentException)))
+
+(deftest byte-sequence-can-write-to-any-sequence
+  (let [bs (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 10)))))
+        os (writable-sequence (repeat 5 nil))]
+    (c/read! bs os)
+    (?= (take 5 (seq os)) (seq (range 5))))
+  (let [src (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 5 10)))))
+        buffer (ByteBuffer/wrap (byte-array 3))
+        dst (WritableByteSequence. buffer)]
+    (c/read! src dst)
+    (?= (seq src) (range 8 10))
+    (?= (.get buffer 0) 5)
+    (?= (.get buffer 1) 6)
+    (?= (.get buffer 2) 7)))
+
+(deftest byte-sequence-can-read-from-other-sequences
+  (let [src (readable-sequence (map byte (range 10)))
+        buffer (ByteBuffer/wrap (byte-array 10))
+        dst (WritableByteSequence. buffer)]
+    (c/write! dst src)
+    (dotimes [i 10] (?= (.get buffer i) i))))
 
 ;;
 ;; Char sequence
 ;;
 
-;char range get, set, specialized read and write
+(deftest char-sequence-get
+  (let [buffer (-> (CharBuffer/wrap (char-array "hihello???"))
+                   (.position 2)
+                   (.limit 8))
+        s (ReadableCharSequence. buffer)]
+    (?= (s/get s 0) \h)
+    (?= (s/get s 1) \e)
+    (?= (s/get s 5) \?)
+    (?throws (s/get s -1) ArrayIndexOutOfBoundsException)
+    (?throws (s/get s 6) ArrayIndexOutOfBoundsException)))
+
+(deftest char-sequence-set
+  (let [buffer (-> (CharBuffer/wrap (char-array 10))
+                   (.position 3) 
+                   (.limit 7))
+        s (WritableCharSequence. buffer)]
+    (dotimes [i 4] (s/set! s i (nth "hello" i)))
+    (?= (.get buffer 3) \h)
+    (?= (.get buffer 4) \e)
+    (?= (.get buffer 5) \l)
+    (?= (.get buffer 6) \l)))
+    
+(deftest char-sequence-can-write-to-any-sequence
+  (let [buffer (CharBuffer/wrap (char-array "hello"))
+        reader (ReadableCharSequence. buffer)
+        writer (writable-sequence (repeat 5 nil))]
+    (c/read! reader writer)
+    (?sequence= reader 5 0 0)
+    (?= (apply str (seq writer)) "hello"))
+  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array "hi again")))
+        buffer (CharBuffer/allocate 5)
+        writer (WritableCharSequence. buffer)]
+    (c/read! reader writer)
+    (?sequence= reader 5 3 0)
+    (?sequence= writer 5 0 0)
+    (?= (.get buffer 0) \h)
+    (?= (.get buffer 4) \g)))
+
+(deftest char-sequence-can-read-from-any-sequence-with-chars
+  (let [buffer (CharBuffer/allocate 10)
+        writer (WritableCharSequence. buffer)
+        reader (readable-sequence "hello")]
+    (c/write! writer reader)
+    (?= (take 5 (seq (.array buffer))) (seq "hello"))))
 
 ;byte to char and back converion methods
 
