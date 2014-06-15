@@ -7,12 +7,8 @@ import evil_ant.Signal
 import evil_ant.MultiSignalSet
 import scala.annotation.tailrec
 
-final case class Result(val read: Int, val writen: Int) {
-  def this(total: Int) = this(total, total)
-}
-
-object Result {
-  val Zero = new Result(0, 0)
+final class Result(val read: Int, val writen: Int) {
+  def this(readAndWriten: Int) = this(readAndWriten, readAndWriten)
 }
 
 trait IChannel extends evil_ant.Closeable {
@@ -42,23 +38,13 @@ trait IChannel extends evil_ant.Closeable {
 
 class Channel extends IChannel
 
-trait IReadableChannel extends IChannel {
-  def canRead(ch: IWritableChannel): Boolean = false
-
-  def read(ch: IWritableChannel): Result = {
-    if(canRead(ch)) readImpl(ch)
-    else if(ch != null && ch.canWrite(this)) ch.writeImpl(this)
-    else throw new UnsupportedOperationException
-  }
-
-  def readImpl(ch: IWritableChannel) : Result = null
-
+trait IInputChannel extends IChannel {
   def pop(): Any
   def popIn(milliseconds: Long): Any
   def tryPop(): Any
 }
 
-trait IReadableChannelLike extends IReadableChannel {
+trait IInputChannelLike extends IInputChannel {
   @tailrec
   private def _pop(): Any = {
     if(onActive != null)
@@ -85,25 +71,15 @@ trait IReadableChannelLike extends IReadableChannel {
   override def tryPop(): Any = throw new UnsupportedOperationException
 }
 
-class ReadableChannel extends Channel with IReadableChannelLike
+class InputChannel extends Channel with IInputChannelLike
 
-trait IWritableChannel extends IChannel {
-  def canWrite(ch: IReadableChannel): Boolean = false
-
-  def write(ch: IReadableChannel): Result = {
-    if(canWrite(ch)) writeImpl(ch)
-    else if(ch != null && ch.canRead(this)) ch.readImpl(this)
-    else throw new UnsupportedOperationException
-  }
-
-  def writeImpl(ch: IReadableChannel): Result = null
-
+trait IOutputChannel extends IChannel {
   def push(obj: Any): Unit
   def pushIn(obj: Any, milliseconds: Long): Boolean
   def tryPush(obj: Any): Boolean
 }
 
-trait IWritableChannelLike extends IWritableChannel {
+trait IOutputChannelLike extends IOutputChannel {
   @tailrec
   private def _push(obj: Any): Unit = {
     if(onActive != null)
@@ -133,11 +109,11 @@ trait IWritableChannelLike extends IWritableChannel {
   override def tryPush(obj: Any): Boolean = throw new UnsupportedOperationException
 }
 
-class WritableChannel extends Channel with IWritableChannelLike
+class OutputChannel extends Channel with IOutputChannelLike
 
-trait IIOChannel extends IChannel with IReadableChannel with IWritableChannel {
-  def reader: IReadableChannel = null
-  def writer: IWritableChannel = null
+trait IIOChannel extends IChannel with IInputChannel with IOutputChannel {
+  def reader: IInputChannel = null
+  def writer: IOutputChannel = null
 
   override def close() = {
     if(reader != null) reader.close()
@@ -147,26 +123,6 @@ trait IIOChannel extends IChannel with IReadableChannel with IWritableChannel {
 
   private[this] def requireReader { if(reader == null) throw new UnsupportedOperationException }
   private[this] def requireWriter { if(writer == null) throw new UnsupportedOperationException }
-
-  override def canRead(ch: IWritableChannel) =
-    if(reader != null && reader.canRead(ch)) true
-    else if(ch != null && ch.canWrite(reader)) true
-    else false
-
-  override def canWrite(ch: IReadableChannel) = 
-    if(writer != null && writer.canWrite(ch)) true
-    else if(ch != null && ch.canRead(writer)) true
-    else false
-
-  override def readImpl(ch: IWritableChannel) = 
-    if(reader != null && reader.canRead(ch)) reader.readImpl(ch)
-    else if(ch != null && ch.canWrite(reader)) ch.writeImpl(reader)
-    else null
-
-  override def writeImpl(ch: IReadableChannel) =
-    if(writer != null && writer.canWrite(ch)) writer.writeImpl(ch)
-    else if(ch != null && ch.canRead(writer)) ch.readImpl(writer)
-    else null
 
   override def push(obj: Any) = { requireWriter; writer.push(obj) }
   override def pushIn(obj: Any, milliseconds: Long) = {

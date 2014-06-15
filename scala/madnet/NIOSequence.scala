@@ -22,7 +22,7 @@ class NIOSequence(buffer: java.nio.Buffer) extends Sequence {
 }
 
 object ByteSequence {
-  private [sequence] def write(ws: WritableByteSequence, rs: ReadableByteSequence) = {
+  def write(ws: OutputByteSequence, rs: InputByteSequence) = {
     val size = scala.math.min(ws.size, rs.size)
     val buffer: java.nio.ByteBuffer = rs.buffer.duplicate
     buffer.limit(rs.begin + size)
@@ -34,18 +34,13 @@ object ByteSequence {
   }
 }
 
-class ReadableByteSequence(val buffer: java.nio.ByteBuffer) extends NIOSequence(buffer)
-    with IReadableSequence {
+class InputByteSequence(val buffer: java.nio.ByteBuffer) extends NIOSequence(buffer)
+    with IInputSequence {
   override def get(i: Int) = { requireValidIndex(i); buffer.get(begin + i) }
-
-  override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
-    case ws: WritableByteSequence => ByteSequence.write(ws, this)
-    case _ => super.readImpl(ch)
-  }
 }
 
-class WritableByteSequence(val buffer: java.nio.ByteBuffer) extends NIOSequence(buffer)
-  with IWritableSequence {
+class OutputByteSequence(val buffer: java.nio.ByteBuffer) extends NIOSequence(buffer)
+  with IOutputSequence {
   override def set(i: Int, v: Any) = {
     requireValidIndex(i)
     try {
@@ -56,15 +51,10 @@ class WritableByteSequence(val buffer: java.nio.ByteBuffer) extends NIOSequence(
       case e: ClassCastException => throw new IllegalArgumentException
     }
   }
-
-  override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
-    case rs: ReadableByteSequence => ByteSequence.write(this, rs)
-    case _ => super.writeImpl(ch)
-  }
 }
 
 object CharSequence {
-  def write(dst: WritableCharSequence, src: ReadableCharSequence) = {
+  def write(dst: OutputCharSequence, src: InputCharSequence) = {
     val size = scala.math.min(dst.size, src.size)
     val buffer = src.buffer.duplicate
     buffer.limit(src.begin + size)
@@ -74,33 +64,38 @@ object CharSequence {
 
     new madnet.channel.Result(size)
   }
+
+  def writeBytes(src: OutputByteSequence, dst: InputCharSequence, charset: Charset) = {
+    val charBegin = dst.begin
+    val byteBegin = src.begin
+
+    val result = charset.newDecoder.decode(src.buffer, dst.buffer, true)
+    if(result.isError) throw new java.nio.charset.CharacterCodingException
+
+    new madnet.channel.Result(src.begin - byteBegin, dst.begin - charBegin)
+  }
+
+  def readBytes(src: InputCharSequence, dst: OutputByteSequence, charset: Charset) = {
+    val charBegin = src.begin
+    val byteBegin = dst.begin
+
+    val result = charset.newEncoder.encode(src.buffer, dst.buffer, true)
+    if(result.isError) throw new java.nio.charset.CharacterCodingException
+
+    new madnet.channel.Result(src.begin - charBegin, dst.begin - byteBegin)
+  }
 }
 
-class ReadableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(buffer)
-    with IReadableSequence {
+class InputCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(buffer)
+    with IInputSequence {
   override def get(i: Int) = {
     requireValidIndex(i)
     buffer.get(begin + i)
   }
-
-  override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
-    case ws: WritableCharSequence => CharSequence.write(ws, this)
-    case _ => super.readImpl(ch)
-  }
-
-  def readBytes(s: WritableByteSequence, charset: Charset) = {
-    val charBegin = begin
-    val byteBegin = s.begin
-
-    val result = charset.newEncoder.encode(buffer, s.buffer, true)
-    if(result.isError) throw new java.nio.charset.CharacterCodingException
-
-    new madnet.channel.Result(begin - charBegin, s.begin - byteBegin)
-  }
 }
 
-class WritableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(buffer)
-    with IWritableSequence {
+class OutputCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(buffer)
+    with IOutputSequence {
   override def set(i: Int, value: Any )  = {
     requireValidIndex(i)
     try {
@@ -110,20 +105,5 @@ class WritableCharSequence(val buffer: java.nio.CharBuffer) extends NIOSequence(
     catch {
       case e: ClassCastException => throw new IllegalArgumentException
     }
-  }
-
-  override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
-    case rs: ReadableCharSequence => CharSequence.write(this, rs)
-    case _ => super.writeImpl(ch)
-  }
-
-  def writeBytes(s: ReadableByteSequence, charset: Charset) = {
-    val charBegin = begin
-    val byteBegin = s.begin
-
-    val result = charset.newDecoder.decode( s.buffer, buffer, true)
-    if(result.isError) throw new java.nio.charset.CharacterCodingException
-
-    new madnet.channel.Result(s.begin - byteBegin, begin - charBegin)
   }
 }

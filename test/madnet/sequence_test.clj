@@ -416,27 +416,83 @@
     (?sequence= writer 2 0 0)
     (?= (seq (.array buffer)) [-48 -102])))
 
-;chars to bytes (equal size)
-;chars to bytes (not enought space in byte buffer)
-;chars to bytes (too much space in byte buffer)
-;chars to bytes (not 1 to 1)
-;chars to bytes (not enough space for last char)
-
-;;
-;;sequence features
-;;
-
-;;buffer (sequence factory)
-;;factory function
-;;thread safety
-;;auto-close read on emptyness
-;;auto-close write on fullness
-;;immutable take, drop and expand
-;;events
-
 ;;
 ;;circular ranges
 ;;
 
 ;;circular ranges reuse beginning of underlying buffer
 ;;circular ranges can have compaction ratio
+
+;;
+;; Sequence fabric function
+;;
+
+(defmacro ?is [expr type] `(?true (instance? ~type ~expr)))
+
+(deftest sequence-fabric-function-creates-sequence-with-size
+  (let [s (s/sequence 10)]
+    (?is s IOSequence)
+    (?false (.linked s))
+    (?is (c/reader s) madnet.sequence.IReadableSequence)
+    (?is (c/writer s) madnet.sequence.IWritableSequence)))
+
+(deftest sequence-fabric-sequence-metrics
+  (let [s (s/sequence 10)]
+    (?sequence= s 0 0 0)
+    (?sequence= (c/reader s) 0 0 10)
+    (?sequence= (c/writer s) 0 10 0)))
+
+(deftest sequence-fabric-with-explicit-reader
+  (let [s (s/sequence 10 :reader [2 5])]
+    (?sequence= s 2 5 0)
+    (?sequence= (c/reader s) 2 5 3)
+    (?sequence= (c/writer s) 7 3 0)))
+
+(deftest sequence-fabric-with-explicit-writer
+  (let [s (s/sequence 10 :writer [3 5])]
+    (?sequence= s 0 3 2)
+    (?sequence= (c/reader s) 0 3 7)
+    (?sequence= (c/writer s) 3 5 2)))
+
+(deftest sequence-fabric-with-explicit-reader-and-writer
+  (let [s (s/sequence 10 :reader [2 5] :writer [4 5])]
+    (?sequence= s 2 5 1)
+    (?sequence= (c/reader s) 2 5 3)
+    (?sequence= (c/writer s) 4 5 1)))
+
+(deftest sequence-fabric-with-sequence-argument
+  (let [s (s/sequence (range -10 10))]
+    (?= (seq s) (range -10 10))
+    (?= (seq (c/reader s)) (range -10 10))))
+
+(deftest sequence-with-element-type
+  (let [s (s/sequence 10 :element :object)]
+    (?is (c/reader s) ReadableObjectSequence)
+    (?is (c/writer s) WritableObjectSequence))
+  (let [s (s/sequence 10 :element :byte)]
+    (?is (c/reader s) ReadableByteSequence)
+    (?is (c/writer s) WritableByteSequence))
+  (let [s (s/sequence 10 :element :char)]
+    (?is (c/reader s) ReadableCharSequence)
+    (?is (c/writer s) WritableCharSequence))
+  (?throws (s/sequence 10 :element :unknown) IllegalArgumentException))
+
+(deftest sequence-direct-option
+  (?true (-> (s/sequence 10 :element :byte :direct true) (c/reader) (.buffer) (.isDirect)))
+  (?false (-> (s/sequence 10 :element :byte :direct false) (c/reader) (.buffer) (.isDirect)))
+  (?throws (s/sequence 10 :element :char :direct false) IllegalArgumentException)
+  (?throws (s/sequence 10 :direct false) IllegalArgumentException))
+
+(deftest sequence-read-only-and-write-only-options
+  (?is (s/sequence 10 :read-only true) ReadableObjectSequence)
+  (?is (s/sequence 10 :write-only true) WritableObjectSequence)
+  (?throws (s/sequence 10 :read-only true :write-only true) IllegalArgumentException))
+
+;:circular option
+
+;;auto-close read on emptyness
+;;auto-close write on fullness
+;;cloning
+;;immutable take, drop and expand
+;;events
+

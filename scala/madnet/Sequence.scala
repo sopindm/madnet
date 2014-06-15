@@ -25,7 +25,7 @@ trait ISequence extends madnet.channel.IChannel with Cloneable {
 
 class Sequence extends madnet.channel.Channel with ISequence
 
-trait IReadableSequence extends ISequence with madnet.channel.IReadableChannelLike
+trait IInputSequence extends ISequence with madnet.channel.IInputChannelLike
     with java.lang.Iterable[Any] {
   def get(n: Int): Any = throw new UnsupportedOperationException
 
@@ -41,34 +41,11 @@ trait IReadableSequence extends ISequence with madnet.channel.IReadableChannelLi
     override def next() = { val current = get(position); position += 1; current }
     override def remove() { throw new UnsupportedOperationException }
   }
-
-  override def canRead(ch: madnet.channel.IWritableChannel) = ch match {
-    case s: IWritableSequence => true
-    case _ => false
-  }
-
-  override def readImpl(ch: madnet.channel.IWritableChannel) = ch match {
-    case w: IWritableSequence => Sequence.write(w, this)
-    case _ => null
-  }
 }
 
-class ReadableSequence extends Sequence with IReadableSequence
+class InputSequence extends Sequence with IInputSequence
 
-object Sequence {
-  private[sequence] 
-  def write(to: IWritableSequence, from: IReadableSequence) = {
-    val size = scala.math.min(to.size, from.size)
-
-    for(i <- 0 until size) to.set(i, from.get(i))
-    from.drop(size)
-    to.drop(size)
-
-    new madnet.channel.Result(size)
-  }
-}
-
-trait IWritableSequence extends ISequence with madnet.channel.IWritableChannelLike {
+trait IOutputSequence extends ISequence with madnet.channel.IOutputChannelLike {
   def set(n: Int, value: Any): Unit = throw new UnsupportedOperationException
 
   override def tryPush(value: Any): Boolean = if(size == 0) false else {
@@ -76,24 +53,14 @@ trait IWritableSequence extends ISequence with madnet.channel.IWritableChannelLi
     drop(1)
     true
   }
-
-  override def canWrite(ch: madnet.channel.IReadableChannel) = ch match {
-    case s: IReadableSequence => true
-    case _ => false
-  }
-
-  override def writeImpl(ch: madnet.channel.IReadableChannel) = ch match {
-    case r: IReadableSequence => Sequence.write(this, r)
-    case _ => null
-  }
 }
 
-class WritableSequence extends Sequence with IWritableSequence
+class OutputSequence extends Sequence with IOutputSequence
 
 class IOSequence(val linked: Boolean) extends Sequence with madnet.channel.IIOChannel
     with java.lang.Iterable[Any] {
-  override def reader: ReadableSequence = throw new UnsupportedOperationException
-  override def writer: WritableSequence = throw new UnsupportedOperationException
+  override def reader: IInputSequence = throw new UnsupportedOperationException
+  override def writer: IOutputSequence = throw new UnsupportedOperationException
 
   override def begin = reader.begin
   override def size = reader.size
@@ -106,18 +73,7 @@ class IOSequence(val linked: Boolean) extends Sequence with madnet.channel.IIOCh
   override def iterator = reader.iterator
 
   override def tryPush(o: Any) = if(writer.tryPush(o)) { reader.expand(1); true } else false
-
-  override def writeImpl(ch: madnet.channel.IReadableChannel) = {
-    val result = super.writeImpl(ch)
-    if(result != null && reader != null) reader.expand(result.writen)
-
-    result
-  }
-
-  override def readImpl(ch: madnet.channel.IWritableChannel) = {
-    val result = super.readImpl(ch)
-    if(result != null && writer != null && linked) writer.expand(result.read)
-
-    result
-  }
 }
+
+
+
