@@ -18,9 +18,6 @@
 ;; Reading/writing
 ;;
 
-(defn write! [c1 c2] (.write c1 c2))
-(defn read! [c1 c2] (.read c1 c2)) 
-
 (defn try-push! [channel obj] (.tryPush channel obj))
 (defn push! [channel obj] (.push channel obj))
 (defn push-in! [channel obj milliseconds] (.pushIn channel obj milliseconds))

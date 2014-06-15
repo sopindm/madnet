@@ -1,7 +1,6 @@
 (ns madnet.sequence
   (:refer-clojure :exclude [sequence get set!])
-  (:require [madnet.channel :as c])
-  (:import [madnet.sequence Sequence$]))
+  (:require [madnet.channel :as c]))
 
 ;;
 ;; Sequence range
@@ -51,15 +50,15 @@
 
 (defn- reader- [type buffer]
   (case type
-    :object (madnet.sequence.ReadableObjectSequence. buffer 0 (count buffer))
-    :byte (madnet.sequence.ReadableByteSequence. (.duplicate buffer))
-    :char (madnet.sequence.ReadableCharSequence. (.duplicate buffer))))
+    :object (madnet.sequence.InputObjectSequence. buffer 0 (count buffer))
+    :byte (madnet.sequence.InputByteSequence. (.duplicate buffer))
+    :char (madnet.sequence.InputCharSequence. (.duplicate buffer))))
 
 (defn- writer- [type buffer]
   (case type
-    :object (madnet.sequence.WritableObjectSequence. buffer 0 (count buffer))
-    :byte (madnet.sequence.WritableByteSequence. (.duplicate buffer))
-    :char (madnet.sequence.WritableCharSequence. (.duplicate buffer))))
+    :object (madnet.sequence.OutputObjectSequence. buffer 0 (count buffer))
+    :byte (madnet.sequence.OutputByteSequence. (.duplicate buffer))
+    :char (madnet.sequence.OutputCharSequence. (.duplicate buffer))))
 
 (defn- sequence- [size-or-coll element direct? read-only write-only]
   (let [buffer (buffer- size-or-coll element direct?)]

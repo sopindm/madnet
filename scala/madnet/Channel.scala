@@ -7,7 +7,7 @@ import evil_ant.Signal
 import evil_ant.MultiSignalSet
 import scala.annotation.tailrec
 
-final class Result(val read: Int, val writen: Int) {
+final case class Result(val read: Int, val writen: Int) {
   def this(readAndWriten: Int) = this(readAndWriten, readAndWriten)
 }
 

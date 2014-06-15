@@ -2,7 +2,7 @@
   (:require [khazad-dum :refer :all]
             [evil-ant :as e]
             [madnet.channel :as c])
-  (:import [madnet.channel Channel ReadableChannel WritableChannel IOChannel Result]))
+  (:import [madnet.channel Channel InputChannel OutputChannel IOChannel Result]))
 
 ;;
 ;; Base interface
@@ -83,50 +83,38 @@
     (?= (set (e/absorbers s)) #{(c/on-active c)})))
 
 ;;
-;; Readable channels
+;; Input channels
 ;;
 
-(defn- readable-channel [& {:keys [readable] :or {readable true}}]
+(defn- input-channel []
   (let [open? (atom true)
         on-active (e/switch)]
-    (proxy [ReadableChannel] []
+    (proxy [InputChannel] []
       (isOpen [] @open?)
       (closeImpl [] (reset! open? false))
       (onActive [] on-active)
-      (canRead [ch] (and readable (instance? WritableChannel ch)))
-      (readImpl [ch] (if (and readable ch) (Result. 0 1)))
       (tryPop [] (if (.ready on-active) 42)))))
 
-(defn- writable-channel [& {:keys [writable] :or {writable true}}]
+(defn- output-channel []
   (let [open? (atom true)
         on-active (e/switch)]
-    (proxy [WritableChannel] []
+    (proxy [OutputChannel] []
       (isOpen [] @open?)
       (closeImpl [] (reset! open? false))
       (onActive [] on-active)
-      (canWrite [ch] (and writable (instance? ReadableChannel ch)))
-      (writeImpl [ch] (if (and writable ch) (Result. 1 0)))
       (tryPush [obj] (.ready on-active)))))
 
-(deftest readable-channels-have-read-method
-  (?unsupported (c/read! (ReadableChannel.) (WritableChannel.))
-                (c/read! (ReadableChannel.) nil)))
-
-(deftest read-returns-result-structure
-  (let [c (readable-channel)]
-    (?= (c/read! c (writable-channel)) (Result. 0 1))))
-
-(deftest readable-channels-have-queue-pop-interface
-  (let [c (ReadableChannel.)]
+(deftest input-channels-have-queue-pop-interface
+  (let [c (InputChannel.)]
     (?unsupported (c/pop! c) (c/pop-in! c 10) (c/try-pop! c))))
 
 (deftest pop-interface-implemented-with-try-pop
-  (with-open [c (readable-channel)]
+  (with-open [c (input-channel)]
     (e/turn-on! (c/on-active c))
     (?= (c/try-pop! c) 42)
     (?= (c/pop-in! c 10) 42)
     (?= (c/pop! c) 42))
-  (with-open [c (readable-channel)]
+  (with-open [c (input-channel)]
     (let [f (future (c/pop-in! c 6))]
       (Thread/sleep 2)
       (?false (realized? f))
@@ -144,34 +132,26 @@
       (?= @f 42))))
 
 (deftest pop-iterface-functions-uses-on-active
-  (with-open [c (readable-channel)]
+  (with-open [c (input-channel)]
     (e/turn-on! (c/on-active c))
     (?emits (c/pop! c) (c/on-active c) [(c/on-active c) c])
     (?emits (c/pop-in! c 10) (c/on-active c) [(c/on-active c) c])))
 
 ;;
-;; Writable channels
+;; Output channels
 ;;
 
-(deftest writable-channels-have-write-method
-  (?unsupported (c/write! (WritableChannel.) (ReadableChannel.))
-                (c/write! (WritableChannel.) nil)))
-
-(deftest write-returns-result-structure
-  (let [c (writable-channel)]
-    (?= (c/write! c (readable-channel)) (Result. 1 0))))
-
-(deftest writable-channels-have-queue-push-interface
-  (let [c (WritableChannel.)]
+(deftest output-channels-have-queue-push-interface
+  (let [c (OutputChannel.)]
     (?unsupported (c/push! c 42) (c/push-in! c (atom 42) 10) (c/try-push! c "42"))))
 
 (deftest push-interface-implemented-with-try-push
-  (with-open [c (writable-channel)]
+  (with-open [c (output-channel)]
     (e/turn-on! (c/on-active c))
     (?true (c/try-push! c 42))
     (?true (c/push-in! c (atom 42) 10))
     (c/push! c [42]))
-  (with-open [c (writable-channel)]
+  (with-open [c (output-channel)]
     (let [f (future (c/push-in! c 42 6))]
       (Thread/sleep 2)
       (?false (realized? f))
@@ -189,14 +169,10 @@
       (?= @f nil))))
 
 (deftest push-iterface-functions-uses-on-active
-  (with-open [c (writable-channel)]
+  (with-open [c (output-channel)]
     (e/turn-on! (c/on-active c))
     (?emits (c/push! c 42) (c/on-active c) [(c/on-active c) c])
     (?emits (c/push-in! c 42 10) (c/on-active c) [(c/on-active c) c])))
-
-(deftest replacing-read-by-write-and-otherwise
-  (?= (c/write! (writable-channel :writable false) (readable-channel)) (Result. 0 1))
-  (?= (c/read! (readable-channel :readable false) (writable-channel)) (Result. 1 0)))
 
 ;;
 ;; IO channels
@@ -207,11 +183,6 @@
     (?= (c/reader c) nil)
     (?= (c/writer c) nil)))
 
-(deftest io-channels-have-read-and-write
-  (let [c (IOChannel.)]
-    (?unsupported (c/write! c (ReadableChannel.))
-                  (c/write! (WritableChannel.) c))))
-
 (deftest io-channels-have-push-and-pop-methods
   (let [c (IOChannel.)]
     (?unsupported (c/push! c 123) (c/push-in! c 123 10) (c/try-push! c 123)
@@ -220,7 +191,7 @@
 (deftest io-channels-have-no-on-active
   (?= (c/on-active (IOChannel.)) nil))
 
-(defn io-channel [& {:keys [reader writer] :or {reader (readable-channel) writer (writable-channel)}}]
+(defn io-channel [& {:keys [reader writer] :or {reader (input-channel) writer (output-channel)}}]
   (let [open? (atom true)
         on-close (e/event)]
     (proxy [IOChannel] []
@@ -232,8 +203,8 @@
 
 (deftest io-channel-close-closed-reader-and-writer
   (with-open [c (io-channel)]
-    (?true (instance? ReadableChannel (c/reader c)))
-    (?true (instance? WritableChannel (c/writer c)))
+    (?true (instance? InputChannel (c/reader c)))
+    (?true (instance? OutputChannel (c/writer c)))
     (c/close c)
     (?false (c/open? c))
     (?false (e/open? (c/on-close c)))
@@ -241,43 +212,29 @@
     (?false (c/open? (c/writer c)))))
 
 (defn simple-reader []
-  (proxy [ReadableChannel] []
+  (proxy [InputChannel] []
     (closeImpl [] nil)
-    (canRead [ch] true)
-    (readImpl [ch] (Result. 10 11))
     (pop [] 1)
     (popIn [time] time)
     (tryPop [] 3)))
 
 (defn simple-writer []
-  (proxy [WritableChannel] []
+  (proxy [OutputChannel] []
     (closeImpl [] nil)
-    (canWrite [ch] true)
-    (writeImpl [ch] (Result. 100 111))
     (push [o] nil)
     (pushIn [o time] (= (mod time 2) 0))
     (tryPush [o] (= (mod o 2) 0))))
 
 (deftest reading-from-io-channel
   (with-open [c (io-channel :reader (simple-reader))]
-    (?= (c/read! c (WritableChannel.)) (Result. 10 11))
     (?= (c/pop! c) 1)
     (?= (c/pop-in! c 100500) 100500)
     (?= (c/try-pop! c) 3)))
 
 (deftest writing-to-io-channel
   (with-open [c (io-channel :writer (simple-writer))]
-    (?= (c/write! c (ReadableChannel.)) (Result. 100 111))
     (?= (c/push! c 123) nil)
     (?= (c/push-in! c 123 102030) true)
     (?= (c/push-in! c 123 102031) false)
     (?= (c/try-push! c 123) false)
     (?= (c/try-push! c 124) true)))
-
-(deftest io-channels-co-operation
-  (?= (c/write! (io-channel) (readable-channel :readable false)) (Result. 1 0))
-  (?= (c/write! (io-channel :writer (writable-channel :writable false)) (readable-channel))
-      (Result. 0 1))
-  (?= (c/read! (io-channel) (writable-channel :writable false)) (Result. 0 1))
-  (?= (c/read! (io-channel :reader (readable-channel :readable false)) (writable-channel))
-      (Result. 1 0)))

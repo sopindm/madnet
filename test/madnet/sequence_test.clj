@@ -5,11 +5,13 @@
             [madnet.sequence :as s])
   (:import [java.nio ByteBuffer CharBuffer]
             [madnet.channel Result]
-           [madnet.sequence Sequence ReadableSequence WritableSequence IOSequence
-                            ObjectSequence ReadableObjectSequence WritableObjectSequence
+           [madnet.sequence Sequence Sequence$
+                            ByteSequence$ CharSequence$
+                            InputSequence OutputSequence IOSequence
+                            ObjectSequence InputObjectSequence OutputObjectSequence
                             NIOSequence
-                            ReadableByteSequence WritableByteSequence
-                            ReadableCharSequence WritableCharSequence]))
+                            InputByteSequence OutputByteSequence
+                            InputCharSequence OutputCharSequence]))
 
 ;;
 ;; Sequence
@@ -74,21 +76,20 @@
 ;;
 
 (deftest readable-sequence-has-random-get-access
-  (?unsupported (s/get (ReadableSequence.) 10)))
+  (?unsupported (s/get (InputSequence.) 10)))
 
 (defn readable-sequence
   ([seq] (readable-sequence seq (count seq)))
   ([seq size] (readable-sequence seq 0 size))
   ([seq begin size & [result]]
      (let [begin (atom begin) size (atom size)]
-       (proxy [ReadableSequence] []
+       (proxy [InputSequence] []
          (size [] @size)
          (begin [] @begin)
          (freeSpace [] (- (count seq) @begin @size))
          (drop [n] (swap! begin + n) (swap! size - n))
          (expand [n] (swap! size + n))
-         (get [n] (nth seq (+ @begin n)))
-         (readImpl [ch] (or result (proxy-super readImpl ch)))))))
+         (get [n] (nth seq (+ @begin n)))))))
 
 (deftest readable-sequence-default-pop-implementation-uses-get-and-drop
   (let [s (readable-sequence (range 2))]
@@ -105,7 +106,7 @@
 ;;
 
 (deftest writable-sequencies-have-random-set-access
-  (let [s (WritableSequence.)]
+  (let [s (OutputSequence.)]
     (?unsupported (s/set! s 42 100500))))
 
 (defn writable-sequence
@@ -113,7 +114,7 @@
   ([seq size] (writable-sequence seq 0 size))
   ([seq begin size & [result]]
      (let [seq (atom seq) begin (atom begin) size (atom size)]
-       (proxy [WritableSequence Iterable] []
+       (proxy [OutputSequence Iterable] []
          (begin [] @begin)
          (size [] @size)
          (freeSpace [] (- (count @seq) @begin @size))
@@ -121,8 +122,7 @@
          (expand [n] (swap! size + n))
          (set [n value] (let [n (+ n @begin)]
                           (swap! seq #(concat (take n %) [value] (drop (inc n) %)))))
-         (iterator [] (.iterator @seq))
-         (writeImpl [ch] (or result (proxy-super writeImpl ch)))))))
+         (iterator [] (.iterator @seq))))))
 
 (deftest writable-sequence-push-implementation-uses-set-and-expand
   (let [s (writable-sequence (repeat 3 nil) 2)]
@@ -131,16 +131,16 @@
     (?= (c/try-push! s 100500) false)
     (?= (seq s) [100 500 nil])))
 
-(deftest default-read-implementation-can-write-to-writable-sequence
+(deftest writing-from-input-sequence-to-output-sequence
   (let [reader (readable-sequence (range 5))
         writer (writable-sequence (repeat 10 nil) 8)]
-    (?= (c/read! reader writer) (Result. 5))
+    (?= (.write Sequence$/MODULE$ writer reader) (Result. 5))
     (?= (seq reader) nil)
     (?= (seq writer)
         (seq (concat (range 5) (repeat 5 nil)))))
   (let [reader (readable-sequence (range 10) 2 5)
         writer (writable-sequence (repeat 5 nil) 1 2)]
-    (?= (c/read! reader writer) (Result. 2))
+    (?= (.write Sequence$/MODULE$ writer reader) (Result. 2))
     (?= (seq reader) (range 4 7))
     (?= (seq writer) [nil 2 3 nil nil])))
 
@@ -189,30 +189,6 @@
     (?= (c/try-pop! s) 3)
     (?sequence= (c/reader s) 1 1)))
 
-(deftest io-sequence-read-reads-from-reader
-  (let [s (io-sequence (readable-sequence (range 5)) nil)
-        writer (writable-sequence (repeat 3 nil))]
-    (?= (c/read! s writer) (Result. 3 3))
-    (?sequence= (c/reader s) 3 2))
-  (let [s (io-sequence (readable-sequence (range 5)) (writable-sequence (range 5)))
-        writer (writable-sequence (repeat 3 nil))]
-    (c/read! s writer)
-    (?sequence= (c/writer s) 0 5)))
-
-(deftest io-sequence-write-writes-to-writer
-  (let [s (io-sequence nil (writable-sequence (repeat 5 nil)))
-        reader (readable-sequence (repeat 3 nil))]
-    (?= (c/write! s reader) (Result. 3 3))
-    (?sequence= (c/writer s) 3 2)))
-
-(deftest io-sequence-write-expands-reader
-  (let [s (io-sequence (readable-sequence (range 5) 2) (writable-sequence (repeat 3 nil)))
-        reader (readable-sequence (range -10 0))]
-    (?= (c/write! s reader) (Result. 3 3))
-    (?sequence= (c/writer s) 3 0)
-    (?sequence= (c/reader s) 0 5)
-    (?= (seq s) (seq (range 5)))))
-
 (deftest droping-from-linked-io-sequence
   (let [s (io-sequence (readable-sequence (repeat 10 nil) 1 4)
                        (writable-sequence (repeat 10 nil) 2 7) :linked true)]
@@ -227,24 +203,6 @@
     (?sequence= (c/reader s) 4 4)
     (?sequence= (c/writer s) 2 7)))
 
-(deftest reading-from-linked-io-sequence-expands-writer
-  (let [s (io-sequence (readable-sequence (range 5)) (writable-sequence (repeat 10 nil) 5) :linked true)
-        writer (writable-sequence (repeat 10 nil))]
-    (?= (c/read! s writer) (Result. 5 5))
-    (?sequence= (c/writer s) 0 10)))
-
-(deftest io-sequence-read-with-no-symmetric-result
-  (let [s (io-sequence (readable-sequence (range 5) 0 5 (Result. 3 4))
-                       (writable-sequence (range 10) 1 2) :linked true)]
-    (?= (c/read! s (writable-sequence (range 5))) (Result. 3 4))
-    (?sequence= (c/writer s) 1 5)))
-
-(deftest io-sequence-write-with-no-symmetric-result
-  (let [s (io-sequence (readable-sequence (range 10) 2 3)
-                       (writable-sequence (range 5) 0 5 (Result. 2 4)))]
-    (?= (c/write! s (readable-sequence (range 100))) (Result. 2 4))
-    (?sequence= (c/reader s) 2 7)))
-
 ;;
 ;; Object sequence
 ;;
@@ -258,21 +216,21 @@
   (?sequence= (s/drop! 20 (ObjectSequence. (object-array 100) 10 50)) 30 30))
 
 (deftest accessing-readable-object-sequences
-  (let [s (ReadableObjectSequence. (object-array (range -50 50)) 10 40)]
+  (let [s (InputObjectSequence. (object-array (range -50 50)) 10 40)]
     (dotimes [i 40] (?= (s/get s i) (- i 40)))
     (?throws (s/get s -1) ArrayIndexOutOfBoundsException)
     (?throws (s/get s 40) ArrayIndexOutOfBoundsException)))
 
 (deftest accessing-writable-object-sequences
   (let [o (object-array 100)
-        s (WritableObjectSequence. o 20 30)]
+        s (OutputObjectSequence. o 20 30)]
     (dotimes [i 30] (s/set! s i (- i)))
     (?= (seq (take 30 (drop 20 (seq o)))) (seq (map #(- %) (range 0 30))))
     (?throws (s/set! s -1 0) ArrayIndexOutOfBoundsException)
     (?throws (s/set! s 30 0) ArrayIndexOutOfBoundsException)))
 
 (deftest object-sequencies-cannot-store-nulls
-  (?throws (s/set! (WritableObjectSequence. (object-array 10) 0 10) 0 nil) IllegalArgumentException))
+  (?throws (s/set! (OutputObjectSequence. (object-array 10) 0 10) 0 nil) IllegalArgumentException))
 
 ;;
 ;; NIO sequence
@@ -292,40 +250,19 @@
 
 (deftest byte-sequence-get
   (let [buffer (ByteBuffer/wrap (byte-array (map byte (range -10 10))))
-        s (ReadableByteSequence. (-> buffer (.position 5) (.limit 15)))]
+        s (InputByteSequence. (-> buffer (.position 5) (.limit 15)))]
     (dotimes [i 10] (?= (s/get s i) (- i 5)))
     (?throws (s/get s -1) ArrayIndexOutOfBoundsException)
     (?throws (s/get s 10) ArrayIndexOutOfBoundsException)))
 
 (deftest byte-sequence-set
   (let [buffer (-> (ByteBuffer/allocate 20) (.position 7) (.limit 13))
-        s (WritableByteSequence. buffer)]
+        s (OutputByteSequence. buffer)]
     (dotimes [i 6] (s/set! s i (byte (- i))))
     (dotimes [i 6] (?= (.get buffer (+ i 7)) (- i)))
     (?throws (s/set! s -1 0) ArrayIndexOutOfBoundsException)
     (?throws (s/set! s 6 0) ArrayIndexOutOfBoundsException)
     (?throws (s/set! s 1 \0) IllegalArgumentException)))
-
-(deftest byte-sequence-can-write-to-any-sequence
-  (let [bs (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 10)))))
-        os (writable-sequence (repeat 5 nil))]
-    (c/read! bs os)
-    (?= (take 5 (seq os)) (seq (range 5))))
-  (let [src (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 5 10)))))
-        buffer (ByteBuffer/wrap (byte-array 3))
-        dst (WritableByteSequence. buffer)]
-    (c/read! src dst)
-    (?= (seq src) (range 8 10))
-    (?= (.get buffer 0) 5)
-    (?= (.get buffer 1) 6)
-    (?= (.get buffer 2) 7)))
-
-(deftest byte-sequence-can-read-from-other-sequences
-  (let [src (readable-sequence (map byte (range 10)))
-        buffer (ByteBuffer/wrap (byte-array 10))
-        dst (WritableByteSequence. buffer)]
-    (c/write! dst src)
-    (dotimes [i 10] (?= (.get buffer i) i))))
 
 ;;
 ;; Char sequence
@@ -335,7 +272,7 @@
   (let [buffer (-> (CharBuffer/wrap (char-array "hihello???"))
                    (.position 2)
                    (.limit 8))
-        s (ReadableCharSequence. buffer)]
+        s (InputCharSequence. buffer)]
     (?= (s/get s 0) \h)
     (?= (s/get s 1) \e)
     (?= (s/get s 5) \?)
@@ -346,35 +283,13 @@
   (let [buffer (-> (CharBuffer/wrap (char-array 10))
                    (.position 3) 
                    (.limit 7))
-        s (WritableCharSequence. buffer)]
+        s (OutputCharSequence. buffer)]
     (dotimes [i 4] (s/set! s i (nth "hello" i)))
     (?= (.get buffer 3) \h)
     (?= (.get buffer 4) \e)
     (?= (.get buffer 5) \l)
     (?= (.get buffer 6) \l)))
     
-(deftest char-sequence-can-write-to-any-sequence
-  (let [buffer (CharBuffer/wrap (char-array "hello"))
-        reader (ReadableCharSequence. buffer)
-        writer (writable-sequence (repeat 5 nil))]
-    (c/read! reader writer)
-    (?sequence= reader 5 0 0)
-    (?= (apply str (seq writer)) "hello"))
-  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array "hi again")))
-        buffer (CharBuffer/allocate 5)
-        writer (WritableCharSequence. buffer)]
-    (c/read! reader writer)
-    (?sequence= reader 5 3 0)
-    (?sequence= writer 5 0 0)
-    (?= (.get buffer 0) \h)
-    (?= (.get buffer 4) \g)))
-
-(deftest char-sequence-can-read-from-any-sequence-with-chars
-  (let [buffer (CharBuffer/allocate 10)
-        writer (WritableCharSequence. buffer)
-        reader (readable-sequence "hello")]
-    (c/write! writer reader)
-    (?= (take 5 (seq (.array buffer))) (seq "hello"))))
 
 ;;
 ;; bytes/chars conversion
@@ -383,35 +298,35 @@
 (defn- unicode-charset [] (java.nio.charset.Charset/forName "UTF-8"))
 
 (deftest converting-simple-byte-sequence-to-chars
-  (let [reader (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 97 100)))))
+  (let [reader (InputByteSequence. (ByteBuffer/wrap (byte-array (map byte (range 97 100)))))
         buffer (CharBuffer/allocate 3)
-        writer (WritableCharSequence. buffer)]
-    (?= (.writeBytes writer reader (unicode-charset)) (Result. 3 3))
+        writer (OutputCharSequence. buffer)]
+    (?= (.readBytes CharSequence$/MODULE$ reader writer (unicode-charset)) (Result. 3 3))
     (?sequence= reader 3 0 0)
     (?sequence= writer 3 0 0)
     (?= (seq (.array buffer)) (seq "abc"))))
 
 (deftest converting-big-byte-sequence-to-char
-  (let [reader (ReadableByteSequence. (ByteBuffer/wrap (byte-array (map byte [-48 -102]))))
+  (let [reader (InputByteSequence. (ByteBuffer/wrap (byte-array (map byte [-48 -102]))))
         buffer (CharBuffer/allocate 1)
-        writer (WritableCharSequence. buffer)]
-    (?= (.writeBytes writer reader (unicode-charset)) (Result. 2 1))
+        writer (OutputCharSequence. buffer)]
+    (?= (.readBytes CharSequence$/MODULE$ reader writer (unicode-charset)) (Result. 2 1))
     (?= (int (.get buffer 0)) 1050)))
 
 (deftest converting-chars-to-bytes
-  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array "hi!!!")))
+  (let [reader (InputCharSequence. (CharBuffer/wrap (char-array "hi!!!")))
         buffer (ByteBuffer/allocate 5)
-        writer (WritableByteSequence. buffer)]
-    (?= (.readBytes reader writer (unicode-charset)) (Result. 5 5))
+        writer (OutputByteSequence. buffer)]
+    (?= (.writeBytes CharSequence$/MODULE$ writer reader (unicode-charset)) (Result. 5 5))
     (?sequence= reader 5 0 0)
     (?sequence= writer 5 0 0)
     (?= (seq (.array buffer)) [104 105 33 33 33])))
 
 (deftest converting-big-char-to-bytes
-  (let [reader (ReadableCharSequence. (CharBuffer/wrap (char-array [(char 1050)])))
+  (let [reader (InputCharSequence. (CharBuffer/wrap (char-array [(char 1050)])))
         buffer (ByteBuffer/allocate 2)
-        writer (WritableByteSequence. buffer)]
-    (?= (.readBytes reader writer (unicode-charset)) (Result. 1 2))
+        writer (OutputByteSequence. buffer)]
+    (?= (.writeBytes CharSequence$/MODULE$ writer reader (unicode-charset)) (Result. 1 2))
     (?sequence= reader 1 0 0)
     (?sequence= writer 2 0 0)
     (?= (seq (.array buffer)) [-48 -102])))
@@ -433,8 +348,8 @@
   (let [s (s/sequence 10)]
     (?is s IOSequence)
     (?false (.linked s))
-    (?is (c/reader s) madnet.sequence.IReadableSequence)
-    (?is (c/writer s) madnet.sequence.IWritableSequence)))
+    (?is (c/reader s) madnet.sequence.IInputSequence)
+    (?is (c/writer s) madnet.sequence.IOutputSequence)))
 
 (deftest sequence-fabric-sequence-metrics
   (let [s (s/sequence 10)]
@@ -467,14 +382,14 @@
 
 (deftest sequence-with-element-type
   (let [s (s/sequence 10 :element :object)]
-    (?is (c/reader s) ReadableObjectSequence)
-    (?is (c/writer s) WritableObjectSequence))
+    (?is (c/reader s) InputObjectSequence)
+    (?is (c/writer s) OutputObjectSequence))
   (let [s (s/sequence 10 :element :byte)]
-    (?is (c/reader s) ReadableByteSequence)
-    (?is (c/writer s) WritableByteSequence))
+    (?is (c/reader s) InputByteSequence)
+    (?is (c/writer s) OutputByteSequence))
   (let [s (s/sequence 10 :element :char)]
-    (?is (c/reader s) ReadableCharSequence)
-    (?is (c/writer s) WritableCharSequence))
+    (?is (c/reader s) InputCharSequence)
+    (?is (c/writer s) OutputCharSequence))
   (?throws (s/sequence 10 :element :unknown) IllegalArgumentException))
 
 (deftest sequence-direct-option
@@ -484,8 +399,8 @@
   (?throws (s/sequence 10 :direct false) IllegalArgumentException))
 
 (deftest sequence-read-only-and-write-only-options
-  (?is (s/sequence 10 :read-only true) ReadableObjectSequence)
-  (?is (s/sequence 10 :write-only true) WritableObjectSequence)
+  (?is (s/sequence 10 :read-only true) InputObjectSequence)
+  (?is (s/sequence 10 :write-only true) OutputObjectSequence)
   (?throws (s/sequence 10 :read-only true :write-only true) IllegalArgumentException))
 
 ;:circular option
@@ -496,3 +411,11 @@
 ;;immutable take, drop and expand
 ;;events
 
+;;
+;; Reading/Writing
+;;
+
+;from generic input sequence to generic output sequence
+;with io sequence
+;byte sequence to byte sequence
+;char sequence to char sequence

@@ -55,6 +55,18 @@ trait IOutputSequence extends ISequence with madnet.channel.IOutputChannelLike {
   }
 }
 
+object Sequence {
+  def write(dst: IOutputSequence, src: IInputSequence) = {
+    val size = scala.math.min(src.size, dst.size)
+
+    for(i <- 0 until size) dst.set(i, src.get(i))
+    src.drop(size)
+    dst.drop(size)
+
+    new madnet.channel.Result(size)
+  }
+}
+
 class OutputSequence extends Sequence with IOutputSequence
 
 class IOSequence(val linked: Boolean) extends Sequence with madnet.channel.IIOChannel

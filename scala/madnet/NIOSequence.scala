@@ -65,17 +65,7 @@ object CharSequence {
     new madnet.channel.Result(size)
   }
 
-  def writeBytes(src: OutputByteSequence, dst: InputCharSequence, charset: Charset) = {
-    val charBegin = dst.begin
-    val byteBegin = src.begin
-
-    val result = charset.newDecoder.decode(src.buffer, dst.buffer, true)
-    if(result.isError) throw new java.nio.charset.CharacterCodingException
-
-    new madnet.channel.Result(src.begin - byteBegin, dst.begin - charBegin)
-  }
-
-  def readBytes(src: InputCharSequence, dst: OutputByteSequence, charset: Charset) = {
+  def writeBytes(dst: OutputByteSequence, src: InputCharSequence, charset: Charset) = {
     val charBegin = src.begin
     val byteBegin = dst.begin
 
@@ -83,6 +73,16 @@ object CharSequence {
     if(result.isError) throw new java.nio.charset.CharacterCodingException
 
     new madnet.channel.Result(src.begin - charBegin, dst.begin - byteBegin)
+  }
+
+  def readBytes(src: InputByteSequence, dst: OutputCharSequence, charset: Charset) = {
+    val charBegin = dst.begin
+    val byteBegin = src.begin
+
+    val result = charset.newDecoder.decode(src.buffer, dst.buffer, true)
+    if(result.isError) throw new java.nio.charset.CharacterCodingException
+
+    new madnet.channel.Result(src.begin - byteBegin, dst.begin - byteBegin)
   }
 }
 
