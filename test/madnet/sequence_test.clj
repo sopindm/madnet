@@ -332,8 +332,13 @@
     (?= (seq (.array buffer)) [-48 -102])))
 
 ;;
-;;circular ranges
+;;circular sequencies
 ;;
+
+;;making circular sequence
+;;drop/take/expand on circular sequence
+
+;;readable circular sequencies
 
 ;;circular ranges reuse beginning of underlying buffer
 ;;circular ranges can have compaction ratio
@@ -393,8 +398,8 @@
   (?throws (s/sequence 10 :element :unknown) IllegalArgumentException))
 
 (deftest sequence-direct-option
-  (?true (-> (s/sequence 10 :element :byte :direct true) (c/reader) (.buffer) (.isDirect)))
-  (?false (-> (s/sequence 10 :element :byte :direct false) (c/reader) (.buffer) (.isDirect)))
+  (?true (-> (s/sequence 10 :element :byte :direct true) (c/reader) .buffer .buffer .isDirect))
+  (?false (-> (s/sequence 10 :element :byte :direct false) (c/reader) .buffer .buffer .isDirect))
   (?throws (s/sequence 10 :element :char :direct false) IllegalArgumentException)
   (?throws (s/sequence 10 :direct false) IllegalArgumentException))
 

@@ -1,5 +1,14 @@
 package madnet.sequence
 
+abstract class Buffer {
+  def size: Int
+
+  def get(index: Int): Any
+  def set(index: Int, value: Any): Unit
+
+  def copy(fromIndex: Int, toIndex: Int, size: Int)
+}
+
 trait ISequence extends madnet.channel.IChannel with Cloneable {
   override def clone: ISequence = throw new UnsupportedOperationException
 
@@ -21,13 +30,21 @@ trait ISequence extends madnet.channel.IChannel with Cloneable {
   def take(n: Int): Unit = { requireSize(n);  size = n }
   def drop(n: Int): Unit = { requireSize(n); size -= n; begin += n }
   def expand(n: Int): Unit = { requireFreeSpace(n); size += n }
+
+  protected def requireValidIndex(i: Int) {
+    if(i < 0 || i >= size) throw new ArrayIndexOutOfBoundsException
+  }
+
+  def buffer: Buffer
 }
 
-class Sequence extends madnet.channel.Channel with ISequence
+class Sequence extends madnet.channel.Channel with ISequence {
+  override def buffer: Buffer = throw new UnsupportedOperationException
+}
 
 trait IInputSequence extends ISequence with madnet.channel.IInputChannelLike
     with java.lang.Iterable[Any] {
-  def get(n: Int): Any = throw new UnsupportedOperationException
+  def get(n: Int): Any = { requireValidIndex(n); buffer.get(begin + n) }
 
   override def tryPop(): Any = { 
     if(size == 0) return null
@@ -46,7 +63,11 @@ trait IInputSequence extends ISequence with madnet.channel.IInputChannelLike
 class InputSequence extends Sequence with IInputSequence
 
 trait IOutputSequence extends ISequence with madnet.channel.IOutputChannelLike {
-  def set(n: Int, value: Any): Unit = throw new UnsupportedOperationException
+  def set(n: Int, value: Any): Unit = {
+    requireValidIndex(n)
+    if(value == null) throw new IllegalArgumentException
+    buffer.set(begin + n, value)
+  }
 
   override def tryPush(value: Any): Boolean = if(size == 0) false else {
     set(0, value)

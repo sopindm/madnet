@@ -1,30 +1,26 @@
 package madnet.sequence
 
-class ObjectSequence(protected val buffer: Array[Any], override var begin: Int, override var size: Int)
+class ObjectBuffer(buffer: Array[Any]) extends Buffer {
+  override def size = buffer.size
+
+  override def get(i: Int) = buffer(i)
+  override def set(i: Int, v: Any) { buffer(i) = v }
+
+  override def copy(from: Int, to: Int, size: Int) {
+    for(i <- 0 until size) buffer(to + i) = buffer(from + i)
+  }
+}
+
+class ObjectSequence(_buffer: Array[Any], override var begin: Int, override var size: Int)
     extends Sequence {
-  require { begin + size <= buffer.size }
+  require { begin + size <= _buffer.size }
 
+  override val buffer = new ObjectBuffer(_buffer)
   override def freeSpace = buffer.size - begin - size
-
-  protected def requireValidIndex(i: Int) {
-    if(i < 0 || i >= size) throw new ArrayIndexOutOfBoundsException
-  }
 }
 
-class InputObjectSequence(buffer: Array[Any], begin: Int, size: Int)
-    extends ObjectSequence(buffer, begin, size) with IInputSequence {
-  override def get(i: Int) = { 
-    requireValidIndex(i)
-    buffer(begin + i)
-  }
-}
+class InputObjectSequence(_buffer: Array[Any], begin: Int, size: Int)
+    extends ObjectSequence(_buffer, begin, size) with IInputSequence
 
-class OutputObjectSequence(buffer: Array[Any], begin: Int, size: Int) 
-  extends ObjectSequence(buffer, begin, size) with IOutputSequence {
-  override def set(i: Int, value: Any) = {
-    requireValidIndex(i)
-    if(value == null) throw new IllegalArgumentException
-    buffer(begin + i) = value
-  }
-}
-
+class OutputObjectSequence(_buffer: Array[Any], begin: Int, size: Int) 
+  extends ObjectSequence(_buffer, begin, size) with IOutputSequence
