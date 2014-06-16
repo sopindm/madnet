@@ -6,6 +6,7 @@
   (:import [java.nio ByteBuffer CharBuffer]
             [madnet.channel Result]
            [madnet.sequence Sequence Sequence$
+                            CircularSequence InputCircularSequence OutputCircularSequence
                             ByteSequence$ CharSequence$
                             InputSequence OutputSequence IOSequence
                             ObjectSequence InputObjectSequence OutputObjectSequence
@@ -203,6 +204,12 @@
     (?sequence= (c/reader s) 4 4)
     (?sequence= (c/writer s) 2 7)))
 
+(deftest linked-io-sequence-free-space
+  (let [s (io-sequence (readable-sequence (repeat 10 nil) 2 2)
+                       (writable-sequence (repeat 10 nil) 4 0) :linked true)]
+    (?= (s/free-space s) 2)))
+    
+
 ;;
 ;; Object sequence
 ;;
@@ -231,6 +238,9 @@
 
 (deftest object-sequencies-cannot-store-nulls
   (?throws (s/set! (OutputObjectSequence. (object-array 10) 0 10) 0 nil) IllegalArgumentException))
+
+;cloning object sequence
+;object buffer copy
 
 ;;
 ;; NIO sequence
@@ -264,6 +274,9 @@
     (?throws (s/set! s 6 0) ArrayIndexOutOfBoundsException)
     (?throws (s/set! s 1 \0) IllegalArgumentException)))
 
+;;cloning byte sequence
+;;byte buffer copy
+
 ;;
 ;; Char sequence
 ;;
@@ -290,6 +303,8 @@
     (?= (.get buffer 5) \l)
     (?= (.get buffer 6) \l)))
     
+;;cloning char sequence
+;;char buffer copy
 
 ;;
 ;; bytes/chars conversion
@@ -332,13 +347,39 @@
     (?= (seq (.array buffer)) [-48 -102])))
 
 ;;
-;;circular sequencies
+;; Circular sequencies
 ;;
 
-;;making circular sequence
-;;drop/take/expand on circular sequence
+(deftest making-circular-sequence
+  (let [s (ObjectSequence. (object-array 20) 8 7)
+        c (CircularSequence. s)]
+    (?sequence= c 8 7 13)
+    (?= (.head c) s)))
 
-;;readable circular sequencies
+(deftest drop-take-and-expand-for-circular-sequence
+  (let [s (ObjectSequence. (object-array 20) 0 20)
+        c (CircularSequence. s)]
+    (s/drop! 12 c)
+    (?sequence= c 12 8 12)
+    (s/expand! 8 c)
+    (?sequence= c 12 16 4)
+    (?sequence= (.head c) 12 8 0)
+    (s/drop! 10 c)
+    (?sequence= c 2 6 14)))
+
+(deftest get-for-input-circular-sequence
+  (let [s (InputObjectSequence. (object-array (range 10)) 5 5)
+        c (InputCircularSequence. s)]
+    (s/expand! 5 c)
+    (?= (s/get c 8) 3)))
+
+(deftest writable-circular-sequence
+  (let [a (object-array (range 5))
+        s (OutputObjectSequence. a 3 2)
+        c (OutputCircularSequence. s)]
+    (s/expand! 3 c)
+    (s/set! c 4 -1)
+    (?= (seq a) [0 1 -1 3 4])))
 
 ;;circular ranges reuse beginning of underlying buffer
 ;;circular ranges can have compaction ratio

@@ -13,12 +13,12 @@ trait ISequence extends madnet.channel.IChannel with Cloneable {
   override def clone: ISequence = throw new UnsupportedOperationException
 
   def begin: Int = throw new UnsupportedOperationException
-  protected def begin_=(n: Int): Unit = throw new UnsupportedOperationException
+  private[sequence] def begin_=(n: Int): Unit = throw new UnsupportedOperationException
 
   def end: Int = begin + size
 
   def size: Int = throw new UnsupportedOperationException
-  protected def size_=(n: Int): Unit = throw new UnsupportedOperationException
+  private[sequence] def size_=(n: Int): Unit = throw new UnsupportedOperationException
 
   def freeSpace: Int = throw new UnsupportedOperationException
 
@@ -97,7 +97,9 @@ class IOSequence(val linked: Boolean) extends Sequence with madnet.channel.IIOCh
 
   override def begin = reader.begin
   override def size = reader.size
-  override def freeSpace = writer.freeSpace
+  override def freeSpace =
+    if(linked) scala.math.min(writer.freeSpace, reader.size)
+    else writer.freeSpace
 
   override def take(n: Int) { throw new UnsupportedOperationException }
   override def drop(n: Int) = { reader.drop(n); if(linked) writer.expand(n) }
