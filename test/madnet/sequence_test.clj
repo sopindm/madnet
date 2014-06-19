@@ -412,12 +412,19 @@
     (?sequence= (s/drop! 1 (.clone c)) 0 4 4)
     (?sequence= (s/drop! 3 (.clone c)) 2 2 6)))
 
-;;compaction
-;;;take/drop/expand with compaction area
-;;;compact reader when size >= threshold and head.end == buffer.size
-;;; copies compacting space to beginning of buffer
-;;;compact writer when begin >= buffer.size - threshold
-;;;setting data at compaction area copies in back
+(deftest compacting-input-circular-sequence
+  (let [s (InputObjectSequence. (object-array (range 10)) 6 4)
+        c (InputCircularSequence. s 4)]
+    (s/drop! 1 c)
+    (?= (seq (.buffer c)) (seq (concat [0] (range 7 10) (range 4 10))))))
+
+(deftest output-circular-sequence-with-compaction-threshold
+  (let [s (OutputObjectSequence. (object-array (range 10)) 6 4)
+        c (OutputCircularSequence. s 4)]
+    (?sequence= (s/drop! 1 c) 1 3)
+    (?= (seq (.buffer c)) (range 10))
+    (?sequence= (s/drop! 2 c) 3 1)
+    (?= (seq (.buffer c)) (seq (concat (range 7) (range 1 3) [9])))))
 
 (deftest cloning-circular-sequences
   (let [s (ObjectSequence. (object-array (range 10)) 0 5)
@@ -428,7 +435,8 @@
     (?sequence= (.clone (s/expand! 1 (CircularSequence. (ObjectSequence. (object-array 10) 8 2))))
                 8 3 7)))
 
-;;cloning circular sequencies
+;;cloning readable circular sequencies
+;;cloning writable circular sequencies
 
 ;;
 ;; Sequence fabric function

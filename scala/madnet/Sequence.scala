@@ -1,12 +1,20 @@
 package madnet.sequence
 
-abstract class Buffer {
+abstract class Buffer extends java.lang.Iterable[Any] {
   def size: Int
 
   def get(index: Int): Any
   def set(index: Int, value: Any): Unit
 
   def copy(fromIndex: Int, toIndex: Int, size: Int)
+
+  override def iterator = new java.util.Iterator[Any] {
+    private[this] var index = 0
+
+    override def hasNext = index < size
+    override def next = { index += 1; get(index - 1) }
+    override def remove { throw new UnsupportedOperationException }
+  }
 }
 
 trait ISequence extends madnet.channel.IChannel with Cloneable {

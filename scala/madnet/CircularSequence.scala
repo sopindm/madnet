@@ -38,14 +38,14 @@ class CircularSequence private ( val head: ISequence,
 
   override def clone = new CircularSequence(head.clone, compactionThreshold, tail)
 
-  protected def compact {
-    if(head.begin >= buffer.size - compactionThreshold &&
-       head.begin + head.size == buffer.size) {
-      val oldSize = size
-      head.begin = head.begin - (buffer.size - compactionThreshold)
-      head.size = oldSize
-      tail = head.begin + head.size - buffer.size
-    }
+  def needCompaction = (head.begin >= buffer.size - compactionThreshold &&
+                        head.begin + head.size == buffer.size)
+
+  def compact = if(needCompaction) {
+    val oldSize = size
+    head.begin = head.begin - (buffer.size - compactionThreshold)
+    head.size = oldSize
+    tail = head.begin + head.size - buffer.size
   }
 
   override def drop(n: Int) {
@@ -55,16 +55,37 @@ class CircularSequence private ( val head: ISequence,
   }
 }
 
-class InputCircularSequence(head: Sequence) extends CircularSequence(head) with IInputSequence {
+class InputCircularSequence(head: ISequence, compactionThreshold: Int)
+    extends CircularSequence(head, compactionThreshold) with IInputSequence {
+  def this(head: ISequence) = this(head, 0)
+
   override def get(n: Int) = {
     requireValidIndex(n)
     buffer.get((begin + n) % buffer.size)
   }
+
+  override def compact {
+    if(needCompaction) 
+      for(i <- head.begin until head.end)
+        buffer.set(i - (buffer.size - compactionThreshold), buffer.get(i))
+
+    super.compact
+  }
 }
 
-class OutputCircularSequence(head: Sequence) extends CircularSequence(head) with IOutputSequence {
+class OutputCircularSequence(head: ISequence, compactionThreshold: Int)
+    extends CircularSequence(head, compactionThreshold) with IOutputSequence {
+  def this(head: ISequence) = this(head, 0)
+
   override def set(n: Int, v: Any) = {
     requireValidIndex(n)
     buffer.set((begin + n) % buffer.size, v)
+  }
+
+  override def drop(n: Int) {
+    if(head.begin < compactionThreshold)
+      for(i <- head.begin until scala.math.min(compactionThreshold, head.begin + n))
+        buffer.set(buffer.size - compactionThreshold + i, buffer.get(i))
+    super.drop(n)
   }
 }
