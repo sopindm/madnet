@@ -239,8 +239,21 @@
 (deftest object-sequencies-cannot-store-nulls
   (?throws (s/set! (OutputObjectSequence. (object-array 10) 0 10) 0 nil) IllegalArgumentException))
 
-;cloning object sequence
-;object buffer copy
+(deftest cloning-object-sequence
+  (let [a (object-array (range 10))
+        s (InputObjectSequence. a 3 5)]
+    (?sequence= (.clone s) 3 5 2)
+    (?sequence= (s/drop! 2 (.clone s)) 5 3 2)
+    (?sequence= s 3 5 2)
+    (let [c (.clone s)]
+      (aset a 3 100)
+      (?= (seq c) (cons 100 (range 4 8))))))
+
+(deftest copy-for-object-buffer
+  (let [a (object-array (range 10))
+        b (madnet.sequence.ObjectBuffer. a)]
+    (.copy b 6 2 3)
+    (?= (seq a) [0 1 6 7 8 5 6 7 8 9])))
 
 ;;
 ;; NIO sequence
@@ -363,9 +376,9 @@
     (?sequence= c 12 8 12)
     (s/expand! 8 c)
     (?sequence= c 12 16 4)
+    (?= (.end c) 8)
     (?sequence= (.head c) 12 8 0)
-    (s/drop! 10 c)
-    (?sequence= c 2 6 14)))
+    (?sequence= (s/drop! 10 c) 2 6 14)))
 
 (deftest get-for-input-circular-sequence
   (let [s (InputObjectSequence. (object-array (range 10)) 5 5)
@@ -381,8 +394,41 @@
     (s/set! c 4 -1)
     (?= (seq a) [0 1 -1 3 4])))
 
-;;circular ranges reuse beginning of underlying buffer
-;;circular ranges can have compaction ratio
+(deftest free-space-end-and-size-for-circular-sequence-with-compaction-area
+  (let [s (ObjectSequence. (object-array (range 10)) 3 5)
+        c (CircularSequence. s 3)]
+    (?= (s/free-space c) 2))
+  (?= (s/free-space (CircularSequence. (ObjectSequence. (object-array 10) 0 5) 3)) 2)
+  (?throws (CircularSequence. (ObjectSequence. (object-array 10) 0 10) 1) IllegalArgumentException)
+  (let [s (ObjectSequence. (object-array (range 10)) 8 2)
+        c (CircularSequence. s 2)]
+    (?sequence= (s/expand! 4 c) 8 6 2)
+    (?= (.end c) 6)))
+
+(deftest droping-for-circular-sequence-with-compaction-area
+  (let [s (ObjectSequence. (object-array (range 10)) 7 3)
+        c (CircularSequence. s 2)]
+    (s/expand! 2 c)
+    (?sequence= (s/drop! 1 (.clone c)) 0 4 4)
+    (?sequence= (s/drop! 3 (.clone c)) 2 2 6)))
+
+;;compaction
+;;;take/drop/expand with compaction area
+;;;compact reader when size >= threshold and head.end == buffer.size
+;;; copies compacting space to beginning of buffer
+;;;compact writer when begin >= buffer.size - threshold
+;;;setting data at compaction area copies in back
+
+(deftest cloning-circular-sequences
+  (let [s (ObjectSequence. (object-array (range 10)) 0 5)
+        c (CircularSequence. s 1)]
+    (?sequence= (.clone c) 0 5 4)
+    (?sequence= (s/drop! 2 (.clone c)) 2 3 6)
+    (?sequence= c 0 5 4)
+    (?sequence= (.clone (s/expand! 1 (CircularSequence. (ObjectSequence. (object-array 10) 8 2))))
+                8 3 7)))
+
+;;cloning circular sequencies
 
 ;;
 ;; Sequence fabric function
@@ -465,3 +511,6 @@
 ;with io sequence
 ;byte sequence to byte sequence
 ;char sequence to char sequence
+
+;writing with circular sequences
+;;writing with compaction (attention to writer compaction)

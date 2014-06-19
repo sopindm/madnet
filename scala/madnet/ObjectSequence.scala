@@ -17,10 +17,16 @@ class ObjectSequence(_buffer: Array[Any], override var begin: Int, override var 
 
   override val buffer = new ObjectBuffer(_buffer)
   override def freeSpace = buffer.size - begin - size
+
+  override def clone = new ObjectSequence(_buffer, begin, size)
 }
 
 class InputObjectSequence(_buffer: Array[Any], begin: Int, size: Int)
-    extends ObjectSequence(_buffer, begin, size) with IInputSequence
+    extends ObjectSequence(_buffer, begin, size) with IInputSequence {
+  override def clone = new InputObjectSequence(_buffer, begin, size)
+}
 
 class OutputObjectSequence(_buffer: Array[Any], begin: Int, size: Int) 
-  extends ObjectSequence(_buffer, begin, size) with IOutputSequence
+  extends ObjectSequence(_buffer, begin, size) with IOutputSequence {
+  override def clone = new OutputObjectSequence(_buffer, begin, size)
+}
